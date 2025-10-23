@@ -1,0 +1,109 @@
+menu "Eth-UART Bridge Configuration"
+
+    config HAS_CLK_EN_PIN
+        bool "Has clock enable pin"
+        default y
+
+    config CLK_EN_GPIO
+        int "CLK enable GPIO number"
+        range 16 16
+        default 16
+        help
+            GPIO number (IOxx) for 50MHz oscillator enable.
+
+    config BRIDGE_PORT
+        int "Bridge port"
+        range 0 65535
+        default 3142
+        help
+            Local port the UART bridge will listen on.
+
+    config ECHO_PORT
+        int "Echo port"
+        range 0 65535
+        default 3333
+        help
+            Local port the echo server will listen on.
+
+    config EXAMPLE_KEEPALIVE_IDLE
+        int "TCP keep-alive idle time(s)"
+        default 5
+        help
+            Keep-alive idle time. In idle time without receiving any data from peer, will send keep-alive probe packet
+
+    config EXAMPLE_KEEPALIVE_INTERVAL
+        int "TCP keep-alive interval time(s)"
+        default 5
+        help
+            Keep-alive probe packet interval time.
+
+    config EXAMPLE_KEEPALIVE_COUNT
+        int "TCP keep-alive packet retry send counts"
+        default 3
+        help
+            Keep-alive probe packet retry count.
+
+    config UART_TX_GPIO
+        int "UART TX GPIO number"
+        range 0 34
+        default 4
+        help
+            GPIO number (IOxx) for serial data TX output.
+
+    config UART_RX_GPIO
+        int "UART RX GPIO number"
+        range 0 35
+        default 35
+        help
+            GPIO number (IOxx) for serial data RX input.
+
+    config UART_RTS_GPIO
+        int "UART RTS GPIO number"
+        range 0 34
+        default 15
+        help
+            GPIO number (IOxx) for serial data RTS output. Low level enables data reception from RX line.
+
+    config UART_CTS_GPIO
+        depends on UART_CTS_EN
+        int "UART CTS GPIO number"
+        range 0 34
+        default 14
+        help
+            GPIO number (IOxx) for serial data CTS input. Low level enables data transmission to TX line.
+
+    config UART_CTS_EN
+        bool "UART CTS enable"
+        default n
+        help
+            Enable using CTS input. Low level on this pin enables data transmission to TX line.
+
+    config BRIDGE_LED_GPIO
+        int "Bridge connected LED GPIO number"
+        range 0 34
+        default 2
+        help
+            GPIO number (IOxx) of the bridge connected indicator. Active level (connection established) is high.
+
+    config UART_BITRATE
+        int "UART baud rate"
+        range 9600 1843200
+        default 921600
+        help
+            UART data transfer rate in bits per second.
+
+    config UART_TX_BUFF_SIZE
+        int "UART transmit buffer size (KB)"
+        range 0 64
+        default 17
+        help
+            UART transmit data buffer size in kilobytes.
+
+    config UART_RX_BUFF_SIZE
+        int "UART receive buffer size (KB)"
+        range 1 64
+        default 17
+        help
+            UART receive data buffer size in kilobytes.
+
+endmenu
