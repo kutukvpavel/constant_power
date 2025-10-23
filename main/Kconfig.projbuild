@@ -1,4 +1,12 @@
-menu "Eth-UART Bridge Configuration"
+menu "Eth Configuration"
+
+    config EXAMPLE_ETH_DEINIT_AFTER_S
+        int "Stop and deinit Ethernet after elapsing number of secs"
+        range -1 300
+        default -1
+        help
+            This option is for demonstration purposes only to demonstrate deinitialization of the Ethernet driver.
+            Set to -1 to not deinitialize.
 
     config HAS_CLK_EN_PIN
         bool "Has clock enable pin"
@@ -10,20 +18,6 @@ menu "Eth-UART Bridge Configuration"
         default 16
         help
             GPIO number (IOxx) for 50MHz oscillator enable.
-
-    config BRIDGE_PORT
-        int "Bridge port"
-        range 0 65535
-        default 3142
-        help
-            Local port the UART bridge will listen on.
-
-    config ECHO_PORT
-        int "Echo port"
-        range 0 65535
-        default 3333
-        help
-            Local port the echo server will listen on.
 
     config EXAMPLE_KEEPALIVE_IDLE
         int "TCP keep-alive idle time(s)"
@@ -43,67 +37,29 @@ menu "Eth-UART Bridge Configuration"
         help
             Keep-alive probe packet retry count.
 
-    config UART_TX_GPIO
-        int "UART TX GPIO number"
-        range 0 34
-        default 4
-        help
-            GPIO number (IOxx) for serial data TX output.
+endmenu
 
-    config UART_RX_GPIO
-        int "UART RX GPIO number"
-        range 0 35
-        default 35
-        help
-            GPIO number (IOxx) for serial data RX input.
+menu "Modbus Configuration"
 
-    config UART_RTS_GPIO
-        int "UART RTS GPIO number"
-        range 0 34
-        default 15
+    config MB_SLAVE_ADDR
+        int "Modbus slave address"
+        range 1 255
+        default 1
         help
-            GPIO number (IOxx) for serial data RTS output. Low level enables data reception from RX line.
+            This is the Modbus slave address in the network.
+            The address is used as an index to resolve slave ip address.
 
-    config UART_CTS_GPIO
-        depends on UART_CTS_EN
-        int "UART CTS GPIO number"
-        range 0 34
-        default 14
+    config MB_MDNS_IP_RESOLVER
+        bool "Resolve slave addresses using mDNS service"
+        default y
         help
-            GPIO number (IOxx) for serial data CTS input. Low level enables data transmission to TX line.
+            This option allows to use mDNS service to resolve IP addresses of the Modbus slaves.
+            If the option is disabled the ip addresses of slaves are defined in static table.
 
-    config UART_CTS_EN
-        bool "UART CTS enable"
-        default n
-        help
-            Enable using CTS input. Low level on this pin enables data transmission to TX line.
-
-    config BRIDGE_LED_GPIO
-        int "Bridge connected LED GPIO number"
-        range 0 34
-        default 2
-        help
-            GPIO number (IOxx) of the bridge connected indicator. Active level (connection established) is high.
-
-    config UART_BITRATE
-        int "UART baud rate"
-        range 9600 1843200
-        default 921600
-        help
-            UART data transfer rate in bits per second.
-
-    config UART_TX_BUFF_SIZE
-        int "UART transmit buffer size (KB)"
-        range 0 64
-        default 17
-        help
-            UART transmit data buffer size in kilobytes.
-
-    config UART_RX_BUFF_SIZE
-        int "UART receive buffer size (KB)"
-        range 1 64
-        default 17
-        help
-            UART receive data buffer size in kilobytes.
+    if MB_MDNS_IP_RESOLVER
+        config MB_MDNS_NAME
+            string "mDNS hostname template"
+            default "cpwr"
+    endif
 
 endmenu

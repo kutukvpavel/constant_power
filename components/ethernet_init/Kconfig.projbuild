@@ -1,4 +1,4 @@
-menu "Ethernet Configuration"
+menu "Example Ethernet Configuration"
 
     orsource "$IDF_PATH/examples/common_components/env_caps/$IDF_TARGET/Kconfig.env_caps"
 
@@ -16,6 +16,15 @@ menu "Ethernet Configuration"
             default EXAMPLE_ETH_PHY_LAN87XX
             help
                 Select the Ethernet PHY device to use in the example.
+
+            config EXAMPLE_ETH_PHY_GENERIC
+                bool "Generic 802.3 PHY"
+                help
+                    Any Ethernet PHY chip compliant with IEEE 802.3 can be used. However, while
+                    basic functionality should always work, some specific features might be limited,
+                    even if the PHY meets IEEE 802.3 standard. A typical example is loopback
+                    functionality, where certain PHYs may require setting a specific speed mode to
+                    operate correctly.
 
             config EXAMPLE_ETH_PHY_IP101
                 bool "IP101"
@@ -52,7 +61,7 @@ menu "Ethernet Configuration"
                 bool "KSZ80xx"
                 help
                     With the KSZ80xx series, Microchip offers single-chip 10BASE-T/100BASE-TX
-                    Ethernet Physical Layer Tranceivers (PHY).
+                    Ethernet Physical Layer Transceivers (PHY).
                     The following chips are supported: KSZ8001, KSZ8021, KSZ8031, KSZ8041,
                         KSZ8051, KSZ8061, KSZ8081, KSZ8091
                     Goto https://www.microchip.com for more information about them.
@@ -61,31 +70,35 @@ menu "Ethernet Configuration"
         config EXAMPLE_ETH_MDC_GPIO
             int "SMI MDC GPIO number"
             range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
-            default 23
+            default 23 if IDF_TARGET_ESP32
+            default 31 if IDF_TARGET_ESP32P4
             help
                 Set the GPIO number used by SMI MDC.
 
         config EXAMPLE_ETH_MDIO_GPIO
             int "SMI MDIO GPIO number"
             range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
-            default 18
+            default 18 if IDF_TARGET_ESP32
+            default 52 if IDF_TARGET_ESP32P4
             help
                 Set the GPIO number used by SMI MDIO.
 
         config EXAMPLE_ETH_PHY_RST_GPIO
             int "PHY Reset GPIO number"
             range -1 ENV_GPIO_OUT_RANGE_MAX
-            default 5
+            default 5 if IDF_TARGET_ESP32
+            default 51 if IDF_TARGET_ESP32P4
             help
                 Set the GPIO number used to reset PHY chip.
                 Set to -1 to disable PHY chip hardware reset.
 
         config EXAMPLE_ETH_PHY_ADDR
             int "PHY Address"
-            range 0 31
+            range -1 31
             default 1
             help
                 Set PHY address according your board schematic.
+                Set to -1 to driver find the PHY address automatically.
     endif # EXAMPLE_USE_INTERNAL_ETHERNET
 
     config EXAMPLE_USE_SPI_ETHERNET
@@ -141,8 +154,10 @@ menu "Ethernet Configuration"
             range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
             default 14 if IDF_TARGET_ESP32
             default 12 if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
-            default 6 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C6
+            default 6 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C61
             default 4 if IDF_TARGET_ESP32H2
+            default 33 if IDF_TARGET_ESP32P4
+            default 8 if IDF_TARGET_ESP32C5
             help
                 Set the GPIO number used by SPI SCLK.
 
@@ -151,8 +166,10 @@ menu "Ethernet Configuration"
             range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
             default 13 if IDF_TARGET_ESP32
             default 11 if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
-            default 7 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C6
+            default 7 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C61
             default 5 if IDF_TARGET_ESP32H2
+            default 32 if IDF_TARGET_ESP32P4
+            default 10 if IDF_TARGET_ESP32C5
             help
                 Set the GPIO number used by SPI MOSI.
 
@@ -161,8 +178,10 @@ menu "Ethernet Configuration"
             range ENV_GPIO_RANGE_MIN ENV_GPIO_IN_RANGE_MAX
             default 12 if IDF_TARGET_ESP32
             default 13 if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32S3
-            default 2 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C6
+            default 2 if IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C61
             default 0 if IDF_TARGET_ESP32H2
+            default 24 if IDF_TARGET_ESP32P4
+            default 9 if IDF_TARGET_ESP32C5
             help
                 Set the GPIO number used by SPI MISO.
 
@@ -178,8 +197,9 @@ menu "Ethernet Configuration"
             range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
             default 15 if IDF_TARGET_ESP32
             default 10 if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32S3 || IDF_TARGET_ESP32C2
-            default 3 if IDF_TARGET_ESP32C6
+            default 3 if IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C5 || IDF_TARGET_ESP32C61
             default 1 if IDF_TARGET_ESP32H2
+            default 21 if IDF_TARGET_ESP32P4
             help
                 Set the GPIO number used by SPI CS0, i.e. Chip Select associated with the first SPI Eth module).
 
@@ -193,6 +213,8 @@ menu "Ethernet Configuration"
             default 21 if IDF_TARGET_ESP32C6
             default 3 if IDF_TARGET_ESP32C2
             default 11 if IDF_TARGET_ESP32H2
+            default 23 if IDF_TARGET_ESP32P4 || IDF_TARGET_ESP32C61
+            default 1 if IDF_TARGET_ESP32C5
             help
                 Set the GPIO number used by SPI CS1, i.e. Chip Select associated with the second SPI Eth module.
 
@@ -200,8 +222,10 @@ menu "Ethernet Configuration"
             int "Interrupt GPIO number SPI Ethernet module #1"
             range -1 ENV_GPIO_IN_RANGE_MAX
             default 4 if IDF_TARGET_ESP32 || IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32S3
-            default 4 if IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C6
+            default 4 if IDF_TARGET_ESP32C2 || IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C5
             default 10 if IDF_TARGET_ESP32H2
+            default 48 if IDF_TARGET_ESP32P4
+            default 0 if IDF_TARGET_ESP32C61
             help
                 Set the GPIO number used by the first SPI Ethernet module interrupt line.
                 Set -1 to use SPI Ethernet module in polling mode.
@@ -212,8 +236,10 @@ menu "Ethernet Configuration"
             range -1 ENV_GPIO_IN_RANGE_MAX
             default 33 if IDF_TARGET_ESP32
             default 5 if IDF_TARGET_ESP32S2 || IDF_TARGET_ESP32C3 || IDF_TARGET_ESP32S3 || IDF_TARGET_ESP32C2
-            default 5 if IDF_TARGET_ESP32C6
+            default 5 if IDF_TARGET_ESP32C6 || IDF_TARGET_ESP32C5
             default 9 if IDF_TARGET_ESP32H2
+            default 47 if IDF_TARGET_ESP32P4
+            default 1 if IDF_TARGET_ESP32C61
             help
                 Set the GPIO number used by the second SPI Ethernet module interrupt line.
                 Set -1 to use SPI Ethernet module in polling mode.
