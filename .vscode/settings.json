@@ -20,6 +20,10 @@
     "*.lst": "asm-list-file",
     "*.S": "platformio-debug.asm",
     "mbcontroller.h": "c",
-    "modbus_params.h": "c"
+    "modbus_params.h": "c",
+    "tcp_slave.h": "c",
+    "chrono": "cpp",
+    "span": "cpp",
+    "cmath": "cpp"
   }
 }

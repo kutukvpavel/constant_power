@@ -15,6 +15,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // This file defines structure of modbus parameters which reflect correspond modbus address space
 // for each modbus register type (coils, discreet inputs, holding registers, input registers)
 #pragma pack(push, 1)
@@ -77,5 +81,9 @@ extern holding_reg_params_t holding_reg_params;
 extern input_reg_params_t input_reg_params;
 extern coil_reg_params_t coil_reg_params;
 extern discrete_reg_params_t discrete_reg_params;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // !defined(_DEVICE_PARAMS)
