@@ -15,7 +15,6 @@
 
 #include "esp_log.h"
 #include "esp_check.h"
-#include "esp_pm.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include <rom/ets_sys.h>
@@ -76,14 +75,6 @@ const my_sr regs[] =
     { GPIO_NUM_12, GPIO_NUM_2, GPIO_NUM_4, true, 3 }, // DACs
     { GPIO_NUM_12, GPIO_NUM_15, GPIO_NUM_4, true, 1 } // LCD
 };
-
-//Power Management
-esp_pm_config_t pm_cfg =
-    {
-        .max_freq_mhz = MAX_CPU_FREQ_MHZ,
-        .min_freq_mhz = DEFAULT_CPU_FREQ_MHZ,
-        .light_sleep_enable = false
-    };
 
 /// @brief LCD configuration for hd44780 library. Note that the databus is handled externally, because it's driven by a 595 shift register.
 static my_lcd::hd44780_t lcd_cfg = 
@@ -150,36 +141,11 @@ namespace my_hal
             sr_write(static_cast<sr_types>(i), zero_ptr);
         }
         set_output_enable(true);
-
-        ESP_LOGI(TAG, "Init PM...");
-        ESP_ERROR_CHECK(esp_pm_configure(&pm_cfg));
-        ESP_LOGI(TAG, "RTC clock source: %i\n", rtc_clk_slow_freq_get());
         
         ESP_LOGI(TAG, "HAL init finished");
         return ESP_OK;
     }
 
-    /// @brief Pin CPU clock frequency (min, default, max). Power management has to be enabled in SDK config for this to work.
-    /// @param t 
-    void set_cpu_freq(cpu_freq_types t)
-    {
-        uint32_t mhz;
-        switch (t)
-        {
-        case cpu_freq_types::max:
-            mhz = MAX_CPU_FREQ_MHZ;
-            break;
-        case cpu_freq_types::min:
-            mhz = MIN_CPU_FREQ_MHZ;
-            break;
-        default:
-            mhz = DEFAULT_CPU_FREQ_MHZ;
-            break;
-        }
-        pm_cfg.max_freq_mhz = mhz;
-        pm_cfg.min_freq_mhz = mhz;
-        esp_pm_configure(&pm_cfg);
-    }
     /// @brief Get HD44780 LCD library configuration
     /// @return Configuration structure
     my_lcd::hd44780_t* get_lcd_config()

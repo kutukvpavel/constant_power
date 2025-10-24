@@ -126,6 +126,8 @@ void app_main(void)
     static bool init_ok = true;
     static QueueHandle_t dbg_queue; //Interop commands from debug console (for example, calibrations)
 
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
     //Init NVS
     ret = my_params::init();
     if (ret != ESP_OK)

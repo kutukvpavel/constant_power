@@ -23,12 +23,6 @@ namespace my_hal
         SR_DAC,
         SR_LCD
     };
-    enum cpu_freq_types
-    {
-        max,
-        def,
-        min
-    };
     enum hardware_rev_types
     {
         pcbV1
@@ -38,7 +32,6 @@ namespace my_hal
 
     my_lcd::hd44780_t* get_lcd_config();
 
-    void set_cpu_freq(cpu_freq_types t);
     void sr_write(sr_types t, const uint8_t* contents);
     void set_output_enable(bool v);
 }
