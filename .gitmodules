@@ -1,0 +1,3 @@
+[submodule "components/ESP32Encoder"]
+	path = components/ESP32Encoder
+	url = git@github.com:kutukvpavel/ESP32Encoder.git
