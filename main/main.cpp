@@ -1,123 +1,26 @@
-/* Ethernet Basic Example
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
+/**
+ * @file main.cpp
+ * @author Paul Kutukov
+ * @brief Constant power sensor heater control board FW
+ * @version 0.1
+ * @date 2025-10-29
+ *  
+ */
 #include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_netif.h"
-#include "esp_eth.h"
-#include "esp_event.h"
 #include "esp_log.h"
 #include "sdkconfig.h"
 
-#include "tcp_slave.h"
-#include "ethernet_init.h"
 #include "menu.h"
 #include "params.h"
 #include "my_dac.h"
 #include "dbg_console.h"
 #include "my_hal.h"
+#include "modbus.h"
 
 static const char *TAG = "main";
-
-static TaskHandle_t mb_slave_loop_handle = NULL;
-
-void mb_event_cb(const mb_param_info_t* reg_info)
-{
-    const char* rw_str = (reg_info->type & MB_READ_MASK) ? "READ" : "WRITE";
-    int sw_type = reg_info->type & MB_READ_WRITE_MASK;
-    // Filter events and process them accordingly
-    switch (sw_type)
-    {
-    case (MB_EVENT_HOLDING_REG_WR | MB_EVENT_HOLDING_REG_RD):
-        // Get parameter information from parameter queue
-        ESP_LOGI(TAG, "HOLDING %s (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
-                 rw_str,
-                 reg_info->time_stamp,
-                 (unsigned)reg_info->mb_offset,
-                 (unsigned)reg_info->type,
-                 (uint32_t)reg_info->address,
-                 (unsigned)reg_info->size);
-        break;
-    case MB_EVENT_INPUT_REG_RD:
-        ESP_LOGI(TAG, "INPUT READ (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
-                 reg_info->time_stamp,
-                 (unsigned)reg_info->mb_offset,
-                 (unsigned)reg_info->type,
-                 (uint32_t)reg_info->address,
-                 (unsigned)reg_info->size);
-        break;
-    case MB_EVENT_DISCRETE_RD:
-        ESP_LOGI(TAG, "DISCRETE READ (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
-                 reg_info->time_stamp,
-                 (unsigned)reg_info->mb_offset,
-                 (unsigned)reg_info->type,
-                 (uint32_t)reg_info->address,
-                 (unsigned)reg_info->size);
-        break;
-    case MB_EVENT_COILS_RD | MB_EVENT_COILS_WR:
-        ESP_LOGI(TAG, "COILS %s (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
-                 rw_str,
-                 reg_info->time_stamp,
-                 (unsigned)reg_info->mb_offset,
-                 (unsigned)reg_info->type,
-                 (uint32_t)reg_info->address,
-                 (unsigned)reg_info->size);
-        break;
-    default:
-        break;
-    }
-}
-
-/** Event handler for Ethernet events */
-static void eth_event_handler(void *arg, esp_event_base_t event_base,
-                              int32_t event_id, void *event_data)
-{
-    uint8_t mac_addr[6] = {0};
-    /* we can get the ethernet driver handle from event data */
-    esp_eth_handle_t eth_handle = *(esp_eth_handle_t *)event_data;
-
-    switch (event_id) {
-    case ETHERNET_EVENT_CONNECTED:
-        esp_eth_ioctl(eth_handle, ETH_CMD_G_MAC_ADDR, mac_addr);
-        ESP_LOGI(TAG, "Ethernet Link Up");
-        ESP_LOGI(TAG, "Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
-                 mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-        break;
-    case ETHERNET_EVENT_DISCONNECTED:
-        ESP_LOGI(TAG, "Ethernet Link Down");
-        break;
-    case ETHERNET_EVENT_START:
-        ESP_LOGI(TAG, "Ethernet Started");
-        break;
-    case ETHERNET_EVENT_STOP:
-        ESP_LOGI(TAG, "Ethernet Stopped");
-        break;
-    default:
-        break;
-    }
-}
-
-/** Event handler for IP_EVENT_ETH_GOT_IP */
-static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
-                                 int32_t event_id, void *event_data)
-{
-    ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
-    const esp_netif_ip_info_t *ip_info = &event->ip_info;
-
-    ESP_LOGI(TAG, "Ethernet Got IP Address");
-    ESP_LOGI(TAG, "~~~~~~~~~~~");
-    ESP_LOGI(TAG, "ETHIP:" IPSTR, IP2STR(&ip_info->ip));
-    ESP_LOGI(TAG, "ETHMASK:" IPSTR, IP2STR(&ip_info->netmask));
-    ESP_LOGI(TAG, "ETHGW:" IPSTR, IP2STR(&ip_info->gw));
-    ESP_LOGI(TAG, "~~~~~~~~~~~");
-}
 
 _BEGIN_STD_C
 void app_main(void)
@@ -135,86 +38,16 @@ void app_main(void)
         ESP_LOGE(TAG, "Init failed: params, err: %s", esp_err_to_name(ret));
         init_ok = false;
     }
-
     //Init HAL
     if (my_hal::init() != ESP_OK)
     {
         ESP_LOGE(TAG, "Init failed: hal");
         init_ok = false;
     }
-
     //Init DAC calibrations
     my_dac::init(my_params::get_dac_cal());
-
-    // Initialize Ethernet driver
-    uint8_t eth_port_cnt = 0;
-    esp_eth_handle_t *eth_handles;
-    ESP_ERROR_CHECK(example_eth_init(&eth_handles, &eth_port_cnt));
-    // Initialize TCP/IP network interface aka the esp-netif (should be called only once in application)
-    ESP_ERROR_CHECK(esp_netif_init());
-    // Create default event loop that running in background
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_t *eth_netifs[eth_port_cnt];
-    esp_eth_netif_glue_handle_t eth_netif_glues[eth_port_cnt];
-    // Create instance(s) of esp-netif for Ethernet(s)
-    if (eth_port_cnt == 1) {
-        // Use ESP_NETIF_DEFAULT_ETH when just one Ethernet interface is used and you don't need to modify
-        // default esp-netif configuration parameters.
-        esp_netif_config_t cfg = ESP_NETIF_DEFAULT_ETH();
-        eth_netifs[0] = esp_netif_new(&cfg);
-        eth_netif_glues[0] = esp_eth_new_netif_glue(eth_handles[0]);
-        // Attach Ethernet driver to TCP/IP stack
-        ESP_ERROR_CHECK(esp_netif_attach(eth_netifs[0], eth_netif_glues[0]));
-    } else {
-        // Use ESP_NETIF_INHERENT_DEFAULT_ETH when multiple Ethernet interfaces are used and so you need to modify
-        // esp-netif configuration parameters for each interface (name, priority, etc.).
-        esp_netif_inherent_config_t esp_netif_config = ESP_NETIF_INHERENT_DEFAULT_ETH();
-        esp_netif_config_t cfg_spi = {
-            .base = &esp_netif_config,
-            .stack = ESP_NETIF_NETSTACK_DEFAULT_ETH
-        };
-        char if_key_str[10];
-        char if_desc_str[10];
-        char num_str[3];
-        for (int i = 0; i < eth_port_cnt; i++) {
-            itoa(i, num_str, 10);
-            strcat(strcpy(if_key_str, "ETH_"), num_str);
-            strcat(strcpy(if_desc_str, "eth"), num_str);
-            esp_netif_config.if_key = if_key_str;
-            esp_netif_config.if_desc = if_desc_str;
-            esp_netif_config.route_prio -= i*5;
-            eth_netifs[i] = esp_netif_new(&cfg_spi);
-            eth_netif_glues[i] = esp_eth_new_netif_glue(eth_handles[i]);
-            // Attach Ethernet driver to TCP/IP stack
-            ESP_ERROR_CHECK(esp_netif_attach(eth_netifs[i], eth_netif_glues[i]));
-        }
-    }
-    // Register user defined event handlers
-    ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler, NULL));
-    // Start Ethernet driver state machine
-    for (int i = 0; i < eth_port_cnt; i++) {
-        ESP_ERROR_CHECK(esp_eth_start(eth_handles[i]));
-    }
-
-    //Start modbus slave server
-    ESP_ERROR_CHECK(init_services());
-    mb_communication_info_t comm_info = { };
-#if !CONFIG_EXAMPLE_CONNECT_IPV6
-    comm_info.ip_addr_type = MB_IPV4;
-#else
-    comm_info.ip_addr_type = MB_IPV6;
-#endif
-    comm_info.ip_mode = MB_MODE_TCP;
-    comm_info.ip_port = MB_TCP_PORT_NUMBER;
-    comm_info.ip_addr = NULL; // Bind to any address
-    comm_info.ip_netif_ptr = &(eth_netifs[0]);
-    comm_info.slave_uid = MB_SLAVE_ADDR;
-    ESP_ERROR_CHECK(slave_init(&comm_info, mb_event_cb));
-    // The Modbus slave logic is located in this function (user handling of Modbus)
-    xTaskCreate(slave_operation_func, "mb_slave_loop", 4096, NULL, 1, &mb_slave_loop_handle);
-    assert(mb_slave_loop_handle);
-
+    //Modbus Slave
+    modbus::init(my_hal::get_netif());
     //Display
     ret = menu::init(my_hal::get_lcd_config());
     if (ret != ESP_OK)
@@ -222,23 +55,25 @@ void app_main(void)
         ESP_LOGE(TAG, "Init failed: menu. %s", esp_err_to_name(ret));
         init_ok = false;
     }
-    
+    else menu::print_message(menu::localized_messages::initializing);
     //Debug console
     dbg_queue = xQueueCreate(4, sizeof(dbg_console::interop_cmd_t));
     dbg_console::init(dbg_queue);
 
+    //Initialization complete
     if (!init_ok)
     {
         ESP_LOGE(TAG, "Init failed. Operation prohibited.");
     }
     else
     {
-        menu::print_message(menu::localized_messages::initializing);
+        menu::repaint();
         my_dac::set_vpwr(0);
         my_dac::set_vlim(5.0f);
         my_hal::set_output_enable(true);
     }
 
+    //Main loop
     static dbg_console::interop_cmd_t dbg_cmd;
     while (1)
     {

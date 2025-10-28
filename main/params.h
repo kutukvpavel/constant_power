@@ -101,11 +101,16 @@ namespace my_params
     void reset_dev_info_dbg();
     uint8_t get_nvs_version();
 
+    const my_dac_cal_t* get_dac_cal();
+    float get_dac_soft_sentinel();
+    float get_last_saved_vpwr();
+    float get_last_saved_vlim();
+
     my_dev_info_t* get_dev_info();
     void set_serial_number(const char* val);
     void set_pcb_revision(const char* val);
-    const my_dac_cal_t* get_dac_cal();
     void set_dac_cal(my_dac_cal_t* c);
-    float get_dac_soft_sentinel();
     void set_dac_soft_sentinel(float v);
+    void set_last_saved_vpwr(float v);
+    void set_last_saved_vlim(float v);
 }

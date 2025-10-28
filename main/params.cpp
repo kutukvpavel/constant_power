@@ -35,7 +35,8 @@ static my_param_storage_common_t storage =
         .dac_cal = my_params::default_dac_cal,
         .dac_soft_sentinel = 5.0f
     };
-
+static float last_set_pwr = 0;
+static float last_set_vlim = 0;
 /// @brief SPIFFS configuration
 static esp_vfs_spiffs_conf_t flash_conf = 
 {
@@ -51,6 +52,8 @@ static const uint8_t storage_ver = 3;
 static const char storage_ver_id[] = "storage_ver";
 static const char storage_val_id[] = "storage";
 static const char my_nvs_namespace[] = "my";
+static const char key_last_set_pwr[] = "pwr";
+static const char key_last_set_vlim[] = "vlim";
 /*** SPIFFS storage constants */
 static const char flash_info_path[] = "/spiffs/i.bin"; //Device info, strings at constant offsets (32*6 = 192 --> 256B)
 
@@ -126,6 +129,25 @@ namespace my_params
         fclose(f);
         return &res;
     }
+
+    float get_last_saved_vpwr()
+    {
+        return last_set_pwr;
+    }
+    float get_last_saved_vlim()
+    {
+        return last_set_vlim;
+    }
+
+    void set_last_saved_vpwr(float v)
+    {
+        last_set_pwr = v;
+    }
+    void set_last_saved_vlim(float v)
+    {
+        last_set_vlim = v;
+    }
+
     /// @brief Set serial number string
     /// @param val Can't be longer than INFO_STR_MAX_LEN characters (usually 31)
     void set_serial_number(const char* val)
@@ -210,13 +232,14 @@ namespace my_params
         ESP_ERROR_CHECK(err);
         my_params_helpers::init_nvs(storage_ver_id, storage_ver, storage_val_id, &storage); //Reads main storage blob
         //Read other (non-monolithic and non-essential) NVS keys
-        /*nvs_handle_t nvs_handle;
+        nvs_handle_t nvs_handle;
         err = open_helper(&nvs_handle, NVS_READONLY);
         if (err == ESP_OK)
         {
-            
+            ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u32(nvs_handle, key_last_set_pwr, reinterpret_cast<uint32_t*>(&last_set_pwr)));
+            ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_get_u32(nvs_handle, key_last_set_vlim, reinterpret_cast<uint32_t*>(&last_set_vlim)));
             nvs_close(nvs_handle);
-        }*/
+        }
 
         // Initialize SPIFFS
         ESP_LOGI(TAG, "SPIFFS init...");
@@ -269,6 +292,8 @@ namespace my_params
         nvs_handle_t handle;
         esp_err_t err = open_helper(&handle, NVS_READWRITE);
         if (err != ESP_OK) return err;
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_u32(handle, key_last_set_pwr, *reinterpret_cast<uint32_t*>(&last_set_pwr)));
+        ESP_ERROR_CHECK_WITHOUT_ABORT(nvs_set_u32(handle, key_last_set_vlim, *reinterpret_cast<uint32_t*>(&last_set_vlim)));
         return save_helper(handle, storage_ver_id, storage_ver, storage_val_id, &storage);
     }
     /// @brief Bytewise NVS dump

@@ -36,7 +36,19 @@ static void initialize_console();
 namespace my_dbg_commands {
     int dump_nvs(int argc, char** argv)
     {
-        
+        auto dac_cal = my_params::get_dac_cal();
+        printf("DAC cal:\n"
+            "\tVpwr: (%f, %f)\n"
+            "\tVlim: (%f, %f)\n"
+            "DAC soft sentinel = %f\n"
+            "Last saved:\n"
+            "\tVpwr = %f\n"
+            "\tVlim = %f\n",
+            dac_cal->gain_vpwr, dac_cal->offset_vpwr,
+            dac_cal->gain_vlim, dac_cal->offset_vlim,
+            my_params::get_dac_soft_sentinel(),
+            my_params::get_last_saved_vpwr(),
+            my_params::get_last_saved_vlim());
         return 0;
     }
 
