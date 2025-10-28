@@ -231,5 +231,35 @@ void app_main(void)
     {
         ESP_LOGE(TAG, "Init failed. Operation prohibited.");
     }
+    else
+    {
+        menu::print_message(menu::localized_messages::initializing);
+        my_dac::set_vpwr(0);
+        my_dac::set_vlim(5.0f);
+        my_hal::set_output_enable(true);
+    }
+
+    static dbg_console::interop_cmd_t dbg_cmd;
+    while (1)
+    {
+        menu::set_watts(my_dac::get_vpwr());
+
+        if (xQueueReceive(dbg_queue, &dbg_cmd, 0) == pdTRUE)
+        {
+            ESP_LOGI(TAG, "Processing debug interop command #%u...", dbg_cmd.cmd);
+            switch (dbg_cmd.cmd) // Blocks
+            {
+            case dbg_console::interop_cmds::override_errors:
+                init_ok = true;
+                my_hal::set_output_enable(true);
+                break;
+            default:
+                ESP_LOGW(TAG, "Unknown debug interop command: %i", dbg_cmd.cmd);
+                break;
+            }
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }    
 }
 _END_STD_C
