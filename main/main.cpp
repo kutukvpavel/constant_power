@@ -82,6 +82,7 @@ void app_main(void)
     static uint32_t btn_counter = 0;
     static float pwr_to_set;
     static float vlim_to_set = my_params::get_last_saved_vlim();
+    static bool wait_for_btn_release = false;
     while (1)
     {
         if (my_hal::get_btn_pressed()) btn_counter++;
@@ -108,6 +109,7 @@ void app_main(void)
                 btn_counter = 0;
                 my_dac::set_vpwr(0);
                 ESP_LOGI(TAG, "Manual disable");
+                wait_for_btn_release = true;
             }
         }
         else
@@ -117,10 +119,16 @@ void app_main(void)
                 is_on = true;
                 btn_counter = 0;
                 ESP_LOGI(TAG, "Manual enable");
+                wait_for_btn_release = true;
             }
         }
         if (menu::set_values(is_on ? pwr_to_set : NAN, vlim_to_set)) menu::repaint();
         modbus::set_values(is_on, pwr_to_set, vlim_to_set, my_dac::get_vpwr(), my_dac::get_vlim());
+
+        if (wait_for_btn_release) {
+            while (my_hal::get_btn_pressed()) vTaskDelay(pdMS_TO_TICKS(10));
+            wait_for_btn_release = false;
+        }
 
         if (xQueueReceive(dbg_queue, &dbg_cmd, 0) == pdTRUE)
         {
