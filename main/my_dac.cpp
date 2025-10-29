@@ -22,6 +22,7 @@
 #define MY_DAC_VPWR_SENTINEL 0x03F0
 #define MY_DAC_SR_VLIM_OFFSET (2u * 8u)
 #define MY_DAC_VREF 5.0f //Volts
+#define MY_DAC_VPWR_OUTPUT_DIVIDER ((750.0f+68.0f+3000.0f)/(750.0f+68.0f/2))
 #define MY_DAC_TO_CODE(v, full_scale) ((v) * ((full_scale - MY_DAC_ZERO_SCALE) / MY_DAC_VREF) + MY_DAC_ZERO_SCALE)
 
 static const char* TAG = "DAC";
@@ -53,7 +54,7 @@ namespace my_dac {
             volt = my_params::get_dac_soft_sentinel();
             ESP_LOGD(TAG, "Soft sentinel reached");
         }
-        volt = MY_DAC_TO_CODE(volt * calibration->gain_vpwr + calibration->offset_vpwr, MY_DAC_VPWR_FULL_SCALE);
+        volt = MY_DAC_TO_CODE(volt * calibration->gain_vpwr * MY_DAC_VPWR_OUTPUT_DIVIDER + calibration->offset_vpwr, MY_DAC_VPWR_FULL_SCALE);
         if (volt > MY_DAC_VPWR_FULL_SCALE)
             volt = MY_DAC_VPWR_FULL_SCALE;
         else if (volt < MY_DAC_ZERO_SCALE)

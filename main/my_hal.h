@@ -42,6 +42,7 @@ namespace my_hal
     esp_netif_t* get_netif();
     bool get_btn_pressed();
 
+    void reset_encoder();
     void sr_write(sr_types t, const uint8_t* contents);
     void set_output_enable(bool v);
 }

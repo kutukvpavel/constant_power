@@ -292,6 +292,10 @@ namespace my_hal
         return eth_netifs[0];
     }
 
+    void reset_encoder()
+    {
+        encoder.clearCount();
+    }
     /// @brief Write bytes to a shift register chain
     /// @param t Shift register chain
     /// @param contents Buffer to write from

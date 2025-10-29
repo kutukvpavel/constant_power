@@ -93,6 +93,7 @@ void app_main(void)
             is_on = true;
             pwr_to_set = modbus::get_pwr_setpoint();
             vlim_to_set = modbus::get_vlim_setpoint();
+            my_hal::reset_encoder();
         }
         else
         {
@@ -114,6 +115,7 @@ void app_main(void)
         }
         else
         {
+            my_hal::reset_encoder();
             if (btn_counter > BUTTON_DEBOUNCE_DELAY)
             {
                 is_on = true;
