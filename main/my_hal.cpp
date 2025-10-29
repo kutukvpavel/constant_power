@@ -32,6 +32,8 @@
 #define MAX_CPU_FREQ_MHZ 160
 #define DEFAULT_CPU_FREQ_MHZ 80
 #define MIN_CPU_FREQ_MHZ 40
+#define ENCODER_MAX_COUNTS 2000
+#define ENCODER_MIN_COUNTS 0
 
 static const char TAG[] = "HAL";
 
@@ -267,7 +269,18 @@ namespace my_hal
     }
     int64_t get_encoder_counts()
     {
-        return encoder.getCount();
+        int64_t c = encoder.getCount();
+        if (c > ENCODER_MAX_COUNTS)
+        {
+            c = ENCODER_MAX_COUNTS;
+            encoder.setCount(ENCODER_MAX_COUNTS);
+        }
+        else if (c < ENCODER_MIN_COUNTS)
+        {
+            c = ENCODER_MIN_COUNTS;
+            encoder.setCount(ENCODER_MIN_COUNTS);
+        }
+        return c;
     }
     esp_netif_t* get_netif()
     {

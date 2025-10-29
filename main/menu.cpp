@@ -38,6 +38,7 @@
  * Right column
  */
 const char txt_units[MY_MENU_RIGHT_COLUMN_WIDTH] = "W";
+const char txt_units_vlim[MY_MENU_RIGHT_COLUMN_WIDTH] = "V";
 
 /**
  * Messages (displayed on the whole screen, no grid, usually during boot)
@@ -84,6 +85,8 @@ namespace menu
 
     /// @brief Part of the LCD RAM "cache": hydrogen concentration string
     static char watts_buffer[MY_MENU_COLUMN_OFFSET + 1];
+    static char vlim_buffer[MY_MENU_COLUMN_OFFSET + 1];
+    static bool have_to_clear = true;
 
     /// @brief Initialize LCD library, create FreeRTOS primitives, start LCD repaint task
     /// @param lcd Pointer to HD44780 library configuration structure
@@ -106,24 +109,43 @@ namespace menu
     {
         my_lcd::clear(lcd_cfg);
         my_lcd::puts(lcd_cfg, s);
+        have_to_clear = true;
     }
-    void set_watts(float w)
+    /// @brief 
+    /// @param watts 
+    /// @param vlim 
+    /// @return True == need repaint
+    bool set_values(float watts, float vlim)
     {
         const char blank[] = "-----";
         static_assert(ARRAY_SIZE(blank) == (MY_MENU_COLUMN_OFFSET));
+        static float prev_w = NAN;
+        static float prev_vlim = NAN;
 
         ACQUIRE_REPAINT_MUTEX();
 
-        if (isfinite(w))
+        bool need_repaint = (prev_w != watts) || (prev_vlim != vlim);
+        if (isfinite(watts))
         {
-            snprintf(watts_buffer, ARRAY_SIZE(watts_buffer), "%1.3f", w);
+            snprintf(watts_buffer, ARRAY_SIZE(watts_buffer), "%1.3f", watts);
         }
         else    
         {
             strncpy(watts_buffer, blank, ARRAY_SIZE(watts_buffer));
         }
+        if (isfinite(vlim))
+        {
+            snprintf(vlim_buffer, ARRAY_SIZE(vlim_buffer), "%1.1f", vlim);
+        }
+        else
+        {
+            strncpy(vlim_buffer, blank, ARRAY_SIZE(vlim_buffer));
+        }
+        prev_w = watts;
+        prev_vlim = vlim;
 
         RELEASE_REPAINT_MUTEX();
+        return need_repaint;
     }
     /// @brief Queue an actual hardware repaint (call after all desired changes have been submited to cache via other functions)
     void repaint()
@@ -140,6 +162,7 @@ namespace menu
 
         ACQUIRE_REPAINT_MUTEX();
         print_str(txt_messages[m]);
+        have_to_clear = true;
         if (xResult == pdTRUE) xSemaphoreGive(repaint_mutex);
         else ESP_LOGW(TAG, "Failed to acquire LCD repaint mutex!");
     }
@@ -159,6 +182,7 @@ namespace menu
 
         ACQUIRE_REPAINT_MUTEX();
         print_str(buffer);
+        have_to_clear = true;
         if (xResult == pdTRUE) xSemaphoreGive(repaint_mutex);
         else ESP_LOGW(TAG, "Failed to acquire LCD repaint mutex!");
     }
@@ -176,23 +200,35 @@ static void repaint_task_body(void *pvParameter)
         xResult = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(interval_ms));
         if (xResult == pdTRUE)
         {
-            const position_t pos_conc_lbl_pos = {MY_MENU_COLUMN_OFFSET, 0};
+            const position_t pos_vlim = {0, 1};
+            const position_t pos_pwr_lbl_pos = {MY_MENU_COLUMN_OFFSET, 0};
+            const position_t pos_vlim_lbl_pos = {MY_MENU_COLUMN_OFFSET, 1};
 
             xResult = xSemaphoreTake(menu::repaint_mutex, pdMS_TO_TICKS(interval_ms));
 
             if (xResult == pdTRUE)
             {
-                my_lcd::clear(lcd_cfg); //1.5mS - long operation that doesn't touch buffers, do not block
+                if (menu::have_to_clear) my_lcd::clear(lcd_cfg); //1.5mS - long operation that doesn't touch buffers, do not block
+                else my_lcd::gotoxy(lcd_cfg, 0, 0);
                 my_lcd::puts(lcd_cfg, menu::watts_buffer);
-                my_lcd::gotoxy(lcd_cfg, pos_conc_lbl_pos.x, pos_conc_lbl_pos.y);
-                my_lcd::puts(lcd_cfg, txt_units);
+                if (menu::have_to_clear) {
+                    my_lcd::gotoxy(lcd_cfg, pos_pwr_lbl_pos.x, pos_pwr_lbl_pos.y);
+                    my_lcd::puts(lcd_cfg, txt_units);
+                }
+                my_lcd::gotoxy(lcd_cfg, pos_vlim.x, pos_vlim.y);
+                my_lcd::puts(lcd_cfg, menu::vlim_buffer);
+                if (menu::have_to_clear) {
+                    my_lcd::gotoxy(lcd_cfg, pos_vlim_lbl_pos.x, pos_vlim_lbl_pos.y);
+                    my_lcd::puts(lcd_cfg, txt_units_vlim);
+                }
+                menu::have_to_clear = false;
 
                 xSemaphoreGive(menu::repaint_mutex);
             }
         }
         else
         {
-            vTaskDelay(2);
+            vTaskDelay(pdMS_TO_TICKS(10));
         }
     }
 }

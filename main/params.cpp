@@ -36,7 +36,7 @@ static my_param_storage_common_t storage =
         .dac_soft_sentinel = 5.0f
     };
 static float last_set_pwr = 0;
-static float last_set_vlim = 0;
+static float last_set_vlim = 5.0f;
 /// @brief SPIFFS configuration
 static esp_vfs_spiffs_conf_t flash_conf = 
 {

@@ -24,10 +24,8 @@
 #define INPUT_OFFSET(field) ((uint16_t)(offsetof(input_reg_params_t, field) >> 1))
 #define MB_REG_DISCRETE_INPUT_START         (0x0000)
 #define MB_REG_COILS_START                  (0x0000)
-#define MB_REG_INPUT_START_AREA0            (INPUT_OFFSET(input_data0)) // register offset input area 0
-#define MB_REG_INPUT_START_AREA1            (INPUT_OFFSET(input_data4)) // register offset input area 1
-#define MB_REG_HOLDING_START_AREA0          (HOLD_OFFSET(holding_data0))
-#define MB_REG_HOLDING_START_AREA1          (HOLD_OFFSET(holding_data4))
+#define MB_REG_INPUT_START_AREA0            (INPUT_OFFSET(power_man)) // register offset input area 0
+#define MB_REG_HOLDING_START_AREA0          (HOLD_OFFSET(power_setpoint))
 
 #define MB_PAR_INFO_GET_TOUT                (10) // Timeout for get parameter info
 
@@ -49,6 +47,7 @@ static const char *TAG = "mb_tcp_slave";
 #define MB_MDNS_INSTANCE(pref) pref"mb_slave_tcp"
 
 static void (*mb_event_handler_func)(const mb_param_info_t* reg_info) = NULL;
+static void *slave_handle = NULL;
 
 // convert mac from binary format to string
 static inline char* gen_mac_str(const uint8_t* mac, char* pref, char* mac_str)
@@ -111,8 +110,8 @@ void slave_operation_func(void *arg)
     ESP_LOGI(TAG, "Modbus task started.");
     for(;;) {
         // Check for read/write events of Modbus master for certain events
-        (void)mbc_slave_check_event(MB_READ_WRITE_MASK);
-        ESP_ERROR_CHECK_WITHOUT_ABORT(mbc_slave_get_param_info(&reg_info, MB_PAR_INFO_GET_TOUT));
+        (void)mbc_slave_check_event(slave_handle, MB_READ_WRITE_MASK);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(mbc_slave_get_param_info(slave_handle, &reg_info, MB_PAR_INFO_GET_TOUT));
         if ((reg_info.type != MB_EVENT_NO_EVENTS) && (mb_event_handler_func)) mb_event_handler_func(&reg_info);
     }
 }
@@ -135,25 +134,18 @@ esp_err_t destroy_services(void)
 }
 
 // Modbus slave initialization
-esp_err_t slave_init(mb_communication_info_t* comm_info, void (*event_handler_func)(const mb_param_info_t*))
+esp_err_t slave_init(mb_communication_info_t* comm_info, void (*event_handler_func)(const mb_param_info_t*), void** handle)
 {
     mb_register_area_descriptor_t reg_area; // Modbus register area descriptor structure
 
-    void* slave_handler = NULL;
     mb_event_handler_func = event_handler_func;
 
     // Initialization of Modbus controller
-    esp_err_t err = mbc_slave_init_tcp(&slave_handler);
-    MB_RETURN_ON_FALSE((err == ESP_OK && slave_handler != NULL), ESP_ERR_INVALID_STATE,
+    esp_err_t err = mbc_slave_create_tcp(comm_info, &slave_handle);
+    MB_RETURN_ON_FALSE((err == ESP_OK && slave_handle != NULL), ESP_ERR_INVALID_STATE,
                                 TAG,
                                 "mb controller initialization fail.");
-
-    // Setup communication parameters and start stack
-    err = mbc_slave_setup((void*)comm_info);
-    MB_RETURN_ON_FALSE((err == ESP_OK), ESP_ERR_INVALID_STATE,
-                                        TAG,
-                                        "mbc_slave_setup fail, returns(0x%x).",
-                                        (int)err);
+    *handle = slave_handle;
 
     // The code below initializes Modbus register area descriptors
     // for Modbus Holding Registers, Input Registers, Coils and Discrete Inputs
@@ -163,19 +155,9 @@ esp_err_t slave_init(mb_communication_info_t* comm_info, void (*event_handler_fu
     // will send exception response for this register area.
     reg_area.type = MB_PARAM_HOLDING; // Set type of register area
     reg_area.start_offset = MB_REG_HOLDING_START_AREA0; // Offset of register area in Modbus protocol
-    reg_area.address = (void*)&holding_reg_params.holding_data0; // Set pointer to storage instance
-    reg_area.size = (MB_REG_HOLDING_START_AREA1 - MB_REG_HOLDING_START_AREA0) << 1; // Set the size of register storage instance
-    err = mbc_slave_set_descriptor(reg_area);
-    MB_RETURN_ON_FALSE((err == ESP_OK), ESP_ERR_INVALID_STATE,
-                                    TAG,
-                                    "mbc_slave_set_descriptor fail, returns(0x%x).",
-                                    (int)err);
-
-    reg_area.type = MB_PARAM_HOLDING; // Set type of register area
-    reg_area.start_offset = MB_REG_HOLDING_START_AREA1; // Offset of register area in Modbus protocol
-    reg_area.address = (void*)&holding_reg_params.holding_data4; // Set pointer to storage instance
-    reg_area.size = sizeof(float) << 2; // Set the size of register storage instance
-    err = mbc_slave_set_descriptor(reg_area);
+    reg_area.address = (void*)&holding_reg_params.power_setpoint; // Set pointer to storage instance
+    reg_area.size = sizeof(holding_reg_params); // Set the size of register storage instance
+    err = mbc_slave_set_descriptor(slave_handle, reg_area);
     MB_RETURN_ON_FALSE((err == ESP_OK), ESP_ERR_INVALID_STATE,
                                     TAG,
                                     "mbc_slave_set_descriptor fail, returns(0x%x).",
@@ -184,18 +166,9 @@ esp_err_t slave_init(mb_communication_info_t* comm_info, void (*event_handler_fu
     // Initialization of Input Registers area
     reg_area.type = MB_PARAM_INPUT;
     reg_area.start_offset = MB_REG_INPUT_START_AREA0;
-    reg_area.address = (void*)&input_reg_params.input_data0;
-    reg_area.size = sizeof(float) << 2;
-    err = mbc_slave_set_descriptor(reg_area);
-    MB_RETURN_ON_FALSE((err == ESP_OK), ESP_ERR_INVALID_STATE,
-                                        TAG,
-                                        "mbc_slave_set_descriptor fail, returns(0x%x).",
-                                        (int)err);
-    reg_area.type = MB_PARAM_INPUT;
-    reg_area.start_offset = MB_REG_INPUT_START_AREA1;
-    reg_area.address = (void*)&input_reg_params.input_data4;
-    reg_area.size = sizeof(float) << 2;
-    err = mbc_slave_set_descriptor(reg_area);
+    reg_area.address = (void*)&(input_reg_params.data_block1[0]);
+    reg_area.size = sizeof(input_reg_params);
+    err = mbc_slave_set_descriptor(slave_handle, reg_area);
     MB_RETURN_ON_FALSE((err == ESP_OK), ESP_ERR_INVALID_STATE,
                                         TAG,
                                         "mbc_slave_set_descriptor fail, returns(0x%x).",
@@ -206,7 +179,7 @@ esp_err_t slave_init(mb_communication_info_t* comm_info, void (*event_handler_fu
     reg_area.start_offset = MB_REG_COILS_START;
     reg_area.address = (void*)&coil_reg_params;
     reg_area.size = sizeof(coil_reg_params);
-    err = mbc_slave_set_descriptor(reg_area);
+    err = mbc_slave_set_descriptor(slave_handle, reg_area);
     MB_RETURN_ON_FALSE((err == ESP_OK), ESP_ERR_INVALID_STATE,
                                     TAG,
                                     "mbc_slave_set_descriptor fail, returns(0x%x).",
@@ -217,14 +190,14 @@ esp_err_t slave_init(mb_communication_info_t* comm_info, void (*event_handler_fu
     reg_area.start_offset = MB_REG_DISCRETE_INPUT_START;
     reg_area.address = (void*)&discrete_reg_params;
     reg_area.size = sizeof(discrete_reg_params);
-    err = mbc_slave_set_descriptor(reg_area);
+    err = mbc_slave_set_descriptor(slave_handle, reg_area);
     MB_RETURN_ON_FALSE((err == ESP_OK), ESP_ERR_INVALID_STATE,
                                     TAG,
                                     "mbc_slave_set_descriptor fail, returns(0x%x).",
                                     (int)err);
 
     // Starts of modbus controller and stack
-    err = mbc_slave_start();
+    err = mbc_slave_start(slave_handle);
     MB_RETURN_ON_FALSE((err == ESP_OK), ESP_ERR_INVALID_STATE,
                                         TAG,
                                         "mbc_slave_start fail, returns(0x%x).",
@@ -236,7 +209,7 @@ esp_err_t slave_init(mb_communication_info_t* comm_info, void (*event_handler_fu
 static esp_err_t slave_destroy(void)
 {
     mb_event_handler_func = NULL;
-    esp_err_t err = mbc_slave_destroy();
+    esp_err_t err = mbc_slave_delete(slave_handle);
     MB_RETURN_ON_FALSE((err == ESP_OK), ESP_ERR_INVALID_STATE,
                                 TAG,
                                 "mbc_slave_destroy fail, returns(0x%x).",

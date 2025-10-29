@@ -14,7 +14,7 @@ namespace menu
 
     esp_err_t init(my_lcd::hd44780_t* lcd);
 
-    void set_watts(float w);
+    bool set_values(float watts, float vlim);
 
     void repaint();
     void print_str(const char* s);

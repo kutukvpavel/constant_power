@@ -24,7 +24,7 @@ void slave_operation_func(void *arg);
 
 esp_err_t init_services(void);
 esp_err_t destroy_services(void);
-esp_err_t slave_init(mb_communication_info_t* comm_info, void (*event_handler_func)(const mb_param_info_t*));
+esp_err_t slave_init(mb_communication_info_t* comm_info, void (*event_handler_func)(const mb_param_info_t*), void** handle);
 
 #ifdef __cplusplus
 }

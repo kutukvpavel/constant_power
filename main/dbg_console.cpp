@@ -51,7 +51,18 @@ namespace my_dbg_commands {
             my_params::get_last_saved_vlim());
         return 0;
     }
-
+    int hw_report(int argc, char** argv)
+    {
+        printf("Vpwr set = %f\n"
+            "Vlim set = %f\n"
+            "Btn pressed = %i\n"
+            "Encoder value = %" PRIi64 "\n",
+            my_dac::get_vpwr(),
+            my_dac::get_vlim(),
+            my_hal::get_btn_pressed(),
+            my_hal::get_encoder_counts());
+        return 0;
+    }
     /* 'version' command */
     static int get_version(int argc, char** argv)
     {
@@ -219,6 +230,10 @@ static const esp_console_cmd_t commands[] = {
         .help = "Dump NVS data",
         .hint = NULL,
         .func = &my_dbg_commands::dump_nvs },
+    { .command = "hw_report",
+        .help = "Report hardware state",
+        .hint = NULL,
+        .func = &my_dbg_commands::hw_report },
     { .command = "version",
         .help = "Get version of chip and SDK",
         .hint = NULL,

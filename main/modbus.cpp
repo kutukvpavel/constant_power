@@ -5,11 +5,13 @@
 #include <esp_log.h>
 
 #include "tcp_slave.h"
+#include "mbcontroller.h"
 
 namespace modbus
 {
     static const char *TAG = "MY_MODBUS";
     static TaskHandle_t mb_slave_loop_handle = NULL;
+    static void* slave_handle = NULL;
 
     void mb_event_cb(const mb_param_info_t* reg_info)
     {
@@ -27,6 +29,7 @@ namespace modbus
                     (unsigned)reg_info->type,
                     (uint32_t)reg_info->address,
                     (unsigned)reg_info->size);
+            
             break;
         case MB_EVENT_INPUT_REG_RD:
             ESP_LOGI(TAG, "INPUT READ (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
@@ -62,20 +65,66 @@ namespace modbus
     {
         //Start modbus slave server
         ESP_ERROR_CHECK(init_services());
-        mb_communication_info_t comm_info = {};
+        mb_communication_info_t tcp_slave_config = {
+            .tcp_opts = {
+                .mode = MB_TCP,
+                .port = MB_TCP_PORT_NUMBER,
+                .uid = MB_SLAVE_ADDR,
 #if !CONFIG_EXAMPLE_CONNECT_IPV6
-        comm_info.ip_addr_type = MB_IPV4;
+                .addr_type = mb_addr_type_t::MB_IPV4,
 #else
-        comm_info.ip_addr_type = MB_IPV6;
+                .addr_type = MB_IPV6,
 #endif
-        comm_info.ip_mode = MB_MODE_TCP;
-        comm_info.ip_port = MB_TCP_PORT_NUMBER;
-        comm_info.ip_addr = NULL; // Bind to any address
-        comm_info.ip_netif_ptr = netif_ptr;
-        comm_info.slave_uid = MB_SLAVE_ADDR;
-        ESP_ERROR_CHECK(slave_init(&comm_info, mb_event_cb));
+                .ip_addr_table = NULL, // Bind to any address
+                .ip_netif_ptr = netif_ptr
+            }
+        };
+        ESP_ERROR_CHECK(slave_init(&tcp_slave_config, mb_event_cb, &slave_handle));
+        assert(slave_handle);
         // The Modbus slave logic is located in this function (user handling of Modbus)
         xTaskCreate(slave_operation_func, "mb_slave_loop", 4096, NULL, 1, &mb_slave_loop_handle);
         assert(mb_slave_loop_handle);
+    }
+
+    bool get_remote_enabled()
+    {
+        if (!slave_handle) return false;
+        mbc_slave_lock(slave_handle);
+        bool enabled = coil_reg_params.coil_0 > 0;
+        mbc_slave_unlock(slave_handle);
+        return enabled;
+    }
+    float get_pwr_setpoint()
+    {
+        assert(slave_handle);
+        mbc_slave_lock(slave_handle);
+        float ret = holding_reg_params.power_setpoint;
+        mbc_slave_unlock(slave_handle);
+        return ret;
+    }
+    float get_vlim_setpoint()
+    {
+        assert(slave_handle);
+        mbc_slave_lock(slave_handle);
+        float ret = holding_reg_params.vlim_setpoint;
+        mbc_slave_unlock(slave_handle);
+        return ret;
+    }
+
+    void set_values(bool is_on, float pwr, float vlim)
+    {
+        if (!slave_handle) return;
+        mbc_slave_lock(slave_handle);
+        discrete_reg_params.discrete_input0 = (is_on ? 1 : 0);
+        input_reg_params.power_man = pwr;
+        input_reg_params.vlim_man = vlim;
+        mbc_slave_unlock(slave_handle);
+    }
+    void disable_remote()
+    {
+        assert(slave_handle);
+        mbc_slave_lock(slave_handle);
+        coil_reg_params.coil_0 = 0;
+        mbc_slave_unlock(slave_handle);
     }
 } // namespace modbus

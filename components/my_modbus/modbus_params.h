@@ -15,6 +15,8 @@
 
 #include <stdint.h>
 
+#define MAX_REGISTERS 255
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,48 +34,38 @@ typedef struct
     uint8_t discrete_input5:1;
     uint8_t discrete_input6:1;
     uint8_t discrete_input7:1;
-    uint8_t discrete_input_port1;
-    uint8_t discrete_input_port2;
 } discrete_reg_params_t;
 #pragma pack(pop)
 
 #pragma pack(push, 1)
 typedef struct
 {
-    uint8_t coils_port0;
-    uint8_t coils_port1;
-    uint8_t coils_port2;
+    uint8_t coil_0:1;
+    uint8_t coil_1:1;
+    uint8_t coil_2:1;
+    uint8_t coil_3:1;
+    uint8_t coil_4:1;
+    uint8_t coil_5:1;
+    uint8_t coil_6:1;
+    uint8_t coil_7:1;
 } coil_reg_params_t;
 #pragma pack(pop)
 
 #pragma pack(push, 1)
 typedef struct
 {
-    float input_data0; // 0
-    float input_data1; // 2
-    float input_data2; // 4
-    float input_data3; // 6
-    uint16_t data[150]; // 8 + 150 = 158
-    float input_data4; // 158
-    float input_data5;
-    float input_data6;
-    float input_data7;
-    uint16_t data_block1[150];
+    float power_man;
+    float vlim_man;
+    uint16_t data_block1[MAX_REGISTERS - 2 * 2];
 } input_reg_params_t;
 #pragma pack(pop)
 
 #pragma pack(push, 1)
 typedef struct
 {
-    float holding_data0;
-    float holding_data1;
-    float holding_data2;
-    float holding_data3;
-    uint16_t test_regs[150];
-    float holding_data4;
-    float holding_data5;
-    float holding_data6;
-    float holding_data7;
+    float power_setpoint;
+    float vlim_setpoint;
+    uint16_t test_regs[MAX_REGISTERS - 2 * 2];
 } holding_reg_params_t;
 #pragma pack(pop)
 

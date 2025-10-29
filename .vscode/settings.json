@@ -24,7 +24,8 @@
     "tcp_slave.h": "c",
     "chrono": "cpp",
     "span": "cpp",
-    "cmath": "cpp"
+    "cmath": "cpp",
+    "esp_mac.h": "c"
   },
   "idf.flashType": "UART"
 }

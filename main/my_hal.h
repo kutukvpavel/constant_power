@@ -34,6 +34,7 @@ namespace my_hal
     my_lcd::hd44780_t* get_lcd_config();
     int64_t get_encoder_counts();
     esp_netif_t* get_netif();
+    bool get_btn_pressed();
 
     void sr_write(sr_types t, const uint8_t* contents);
     void set_output_enable(bool v);
