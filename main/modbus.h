@@ -11,6 +11,6 @@ namespace modbus
     float get_pwr_setpoint();
     float get_vlim_setpoint();
 
-    void set_values(bool is_on, float pwr, float vlim);
+    void set_values(bool is_on, float pwr, float vlim, float vpwr, float dac_vlim);
     void disable_remote();
 } // namespace modbus

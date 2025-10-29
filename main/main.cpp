@@ -20,9 +20,9 @@
 #include "dbg_console.h"
 #include "my_hal.h"
 #include "modbus.h"
+#include "my_math.h"
 
 #define BUTTON_DEBOUNCE_DELAY 10 //x[main loop delay[]
-#define ENCODER_RESOLUTION_STEP 0.001f //W
 
 static const char *TAG = "main";
 
@@ -72,7 +72,7 @@ void app_main(void)
     else
     {
         my_dac::set_vpwr(0);
-        my_dac::set_vlim(my_params::get_last_saved_vlim());
+        my_dac::set_vlim(my_math::vlim_to_dac_vlim(my_params::get_last_saved_vlim()));
         my_hal::set_output_enable(true);
     }
 
@@ -81,12 +81,13 @@ void app_main(void)
     static bool is_on = false;
     static uint32_t btn_counter = 0;
     static float pwr_to_set;
-    static float vlim_to_set;
+    static float vlim_to_set = my_params::get_last_saved_vlim();
     while (1)
     {
         if (my_hal::get_btn_pressed()) btn_counter++;
         else btn_counter = 0;
-        if (modbus::get_remote_enabled())
+        bool remote = modbus::get_remote_enabled();
+        if (remote)
         {
             is_on = true;
             pwr_to_set = modbus::get_pwr_setpoint();
@@ -94,13 +95,12 @@ void app_main(void)
         }
         else
         {
-            pwr_to_set = static_cast<float>(my_hal::get_encoder_counts()) * ENCODER_RESOLUTION_STEP;
-            vlim_to_set = NAN;
+            pwr_to_set = my_math::encoder_to_power(my_hal::get_encoder_counts());
         }
         if (is_on)
         {
-            my_dac::set_vpwr(pwr_to_set);
-            if (isfinite(vlim_to_set)) my_dac::set_vlim(vlim_to_set);
+            my_dac::set_vpwr(my_math::power_to_vpwr(pwr_to_set));
+            if (remote) my_dac::set_vlim(my_math::vlim_to_dac_vlim(vlim_to_set));
             if (btn_counter > BUTTON_DEBOUNCE_DELAY)
             {
                 is_on = false;
@@ -117,8 +117,8 @@ void app_main(void)
                 btn_counter = 0;
             }
         }
-        if (menu::set_values(is_on ? pwr_to_set : NAN, my_dac::get_vlim())) menu::repaint();
-        modbus::set_values(is_on, my_dac::get_vpwr(), my_dac::get_vlim());
+        if (menu::set_values(is_on ? pwr_to_set : NAN, vlim_to_set)) menu::repaint();
+        modbus::set_values(is_on, pwr_to_set, vlim_to_set, my_dac::get_vpwr(), my_dac::get_vlim());
 
         if (xQueueReceive(dbg_queue, &dbg_cmd, 0) == pdTRUE)
         {

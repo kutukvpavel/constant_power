@@ -56,7 +56,9 @@ typedef struct
 {
     float power_man;
     float vlim_man;
-    uint16_t data_block1[MAX_REGISTERS - 2 * 2];
+    float vpwr;
+    float dac_vlim;
+    uint16_t data_block1[MAX_REGISTERS - 2 * 4];
 } input_reg_params_t;
 #pragma pack(pop)
 

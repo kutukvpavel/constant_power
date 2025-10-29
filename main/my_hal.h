@@ -11,7 +11,13 @@
 
 #include "my_lcd.h"
 
-#define FIRMWARE_VERSION_STR "portable_angstrem-v1.2.2"
+#define FIRMWARE_VERSION_STR "constant_pwr-v0.1"
+
+#define MY_PWR_MAX 3.0f
+#define MY_VLIM_MAX 6.0f
+#define MY_VLIM_MIN 2.0f
+
+#define ENCODER_RESOLUTION_STEP 0.001f //W
 
 #ifdef __cplusplus
 

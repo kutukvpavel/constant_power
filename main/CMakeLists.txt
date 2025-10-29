@@ -5,6 +5,7 @@ idf_component_register(SRCS "main.cpp"
                             "my_hal.cpp"
                             "my_dac.cpp"
                             "modbus.cpp"
+                            "my_math.cpp"
                         PRIV_REQUIRES esp_netif 
                             esp_eth 
                             nvs_flash 

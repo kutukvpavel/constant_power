@@ -7,6 +7,8 @@
 #include "tcp_slave.h"
 #include "mbcontroller.h"
 
+#include "my_hal.h"
+
 namespace modbus
 {
     static const char *TAG = "MY_MODBUS";
@@ -98,6 +100,14 @@ namespace modbus
     {
         assert(slave_handle);
         mbc_slave_lock(slave_handle);
+        if (holding_reg_params.power_setpoint < 0)
+        {
+            holding_reg_params.power_setpoint = 0;
+        }
+        else if (holding_reg_params.power_setpoint > MY_PWR_MAX)
+        {
+            holding_reg_params.power_setpoint = MY_PWR_MAX;
+        }
         float ret = holding_reg_params.power_setpoint;
         mbc_slave_unlock(slave_handle);
         return ret;
@@ -106,18 +116,28 @@ namespace modbus
     {
         assert(slave_handle);
         mbc_slave_lock(slave_handle);
+        if (holding_reg_params.vlim_setpoint < MY_VLIM_MIN)
+        {
+            holding_reg_params.vlim_setpoint = MY_VLIM_MIN;
+        }
+        else if (holding_reg_params.vlim_setpoint > MY_VLIM_MAX)
+        {
+            holding_reg_params.vlim_setpoint = MY_VLIM_MAX;
+        }
         float ret = holding_reg_params.vlim_setpoint;
         mbc_slave_unlock(slave_handle);
         return ret;
     }
 
-    void set_values(bool is_on, float pwr, float vlim)
+    void set_values(bool is_on, float pwr, float vlim, float vpwr, float dac_vlim)
     {
         if (!slave_handle) return;
         mbc_slave_lock(slave_handle);
         discrete_reg_params.discrete_input0 = (is_on ? 1 : 0);
         input_reg_params.power_man = pwr;
         input_reg_params.vlim_man = vlim;
+        input_reg_params.vpwr = vpwr;
+        input_reg_params.dac_vlim = dac_vlim;
         mbc_slave_unlock(slave_handle);
     }
     void disable_remote()
