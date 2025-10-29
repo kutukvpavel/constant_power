@@ -107,6 +107,7 @@ void app_main(void)
                 modbus::disable_remote();
                 btn_counter = 0;
                 my_dac::set_vpwr(0);
+                ESP_LOGI(TAG, "Manual disable");
             }
         }
         else
@@ -115,6 +116,7 @@ void app_main(void)
             {
                 is_on = true;
                 btn_counter = 0;
+                ESP_LOGI(TAG, "Manual enable");
             }
         }
         if (menu::set_values(is_on ? pwr_to_set : NAN, vlim_to_set)) menu::repaint();

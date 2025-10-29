@@ -76,12 +76,12 @@ struct my_sr
     bool msb_first; //Bit order
     size_t len; //Bytes
 };
-
 const my_sr regs[] = 
 {
     { GPIO_NUM_12, GPIO_NUM_2, GPIO_NUM_4, true, 3 }, // DACs
     { GPIO_NUM_12, GPIO_NUM_15, GPIO_NUM_4, true, 1 } // LCD
 };
+static SemaphoreHandle_t sr_mutex_handle = NULL;
 
 /// @brief LCD configuration for hd44780 library. Note that the databus is handled externally, because it's driven by a 595 shift register.
 static my_lcd::hd44780_t lcd_cfg = 
@@ -188,9 +188,14 @@ namespace my_hal
         }
 
         ESP_LOGI(TAG, "Init SRs...");
+        sr_mutex_handle = xSemaphoreCreateMutex();
+        assert(sr_mutex_handle);
         //Set shift register pins as outputs and load all zeros
         for (size_t i = 0; i < ARRAY_SIZE(regs); i++)
         {
+            gpio_pad_select_gpio(regs[i].d);
+            gpio_pad_select_gpio(regs[i].clk);
+            gpio_pad_select_gpio(regs[i].latch);
             gpio_set_direction(regs[i].d, GPIO_MODE_OUTPUT);
             gpio_set_direction(regs[i].clk, GPIO_MODE_OUTPUT);
             gpio_set_direction(regs[i].latch, GPIO_MODE_OUTPUT);
@@ -294,7 +299,10 @@ namespace my_hal
     {
         const size_t byte_len = 8;
         assert(t < ARRAY_SIZE(regs));
+        assert(sr_mutex_handle);
         static_assert(sizeof(dac_code_t) >= 3, "Warning: check DAC shift register length!");
+        
+        while (xSemaphoreTake(sr_mutex_handle, portMAX_DELAY) != pdTRUE);
 
         auto sr = regs[t];
         ESP_ERROR_CHECK(gpio_set_level(sr.latch, 0));
@@ -311,12 +319,14 @@ namespace my_hal
             }
         }
         ESP_ERROR_CHECK(gpio_set_level(sr.latch, 1));
+
+        xSemaphoreGive(sr_mutex_handle);
     }
     /// @brief 
     /// @return True == the button is pressed, false otherwise
     bool get_btn_pressed()
     {
-        return gpio_get_level(pin_btn) == 0; //Active LOW
+        return gpio_get_level(pin_btn) > 0; //Active HIGH
     }
     /// @brief Enable DAC outputs. They should be disabled when analog PSU is not active for power not to leak into analog circuits.
     /// @param v True == enable

@@ -21,6 +21,8 @@
 #define MY_DAC_ZERO_SCALE 0x0000
 #define MY_DAC_VPWR_SENTINEL 0x03F0
 #define MY_DAC_SR_VLIM_OFFSET (2u * 8u)
+#define MY_DAC_VREF 5.0f //Volts
+#define MY_DAC_TO_CODE(v, full_scale) ((v) * ((full_scale - MY_DAC_ZERO_SCALE) / MY_DAC_VREF) + MY_DAC_ZERO_SCALE)
 
 static const char* TAG = "DAC";
 
@@ -51,7 +53,7 @@ namespace my_dac {
             volt = my_params::get_dac_soft_sentinel();
             ESP_LOGD(TAG, "Soft sentinel reached");
         }
-        volt = volt * calibration->gain_vpwr + 0.5 + calibration->offset_vpwr;
+        volt = MY_DAC_TO_CODE(volt * calibration->gain_vpwr + calibration->offset_vpwr, MY_DAC_VPWR_FULL_SCALE);
         if (volt > MY_DAC_VPWR_FULL_SCALE)
             volt = MY_DAC_VPWR_FULL_SCALE;
         else if (volt < MY_DAC_ZERO_SCALE)
@@ -62,7 +64,7 @@ namespace my_dac {
             ESP_LOGD(TAG, "Sentinel reached.");
         }
         last_code &= ~(MY_DAC_VPWR_FULL_SCALE); 
-        my_hal::dac_code_t code = static_cast<my_hal::dac_code_t>(volt);
+        my_hal::dac_code_t code = static_cast<my_hal::dac_code_t>(volt + 0.5f);
         last_code |= (code >> 2u) & 0xFF;
         last_code |= (code & 0b11) << 8u;
         my_hal::sr_write(my_hal::sr_types::SR_DAC, reinterpret_cast<uint8_t*>(&last_code));
@@ -82,13 +84,13 @@ namespace my_dac {
             return;
         }
         last_vlim = volt;
-        volt = volt * calibration->gain_vlim + 0.5 + calibration->offset_vlim;
+        volt = MY_DAC_TO_CODE(volt * calibration->gain_vlim + calibration->offset_vlim, MY_DAC_VLIM_FULL_SCALE);
         if (volt > MY_DAC_VLIM_FULL_SCALE)
             volt = MY_DAC_VLIM_FULL_SCALE;
         else if (volt < MY_DAC_ZERO_SCALE)
             volt = MY_DAC_ZERO_SCALE;
         last_code &= ~(MY_DAC_VLIM_FULL_SCALE << MY_DAC_SR_VLIM_OFFSET);
-        last_code |= static_cast<my_hal::dac_code_t>(volt) << MY_DAC_SR_VLIM_OFFSET;
+        last_code |= static_cast<my_hal::dac_code_t>(volt + 0.5f) << MY_DAC_SR_VLIM_OFFSET;
         my_hal::sr_write(my_hal::sr_types::SR_DAC, reinterpret_cast<uint8_t*>(&last_code));
     }
     /// @brief 
