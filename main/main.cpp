@@ -22,7 +22,7 @@
 #include "modbus.h"
 #include "my_math.h"
 
-#define BUTTON_DEBOUNCE_DELAY 10 //x[main loop delay[]
+#define BUTTON_DEBOUNCE_DELAY 10 //x[main loop delay]
 
 static const char *TAG = "main";
 

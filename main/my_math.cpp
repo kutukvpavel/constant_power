@@ -11,7 +11,8 @@ namespace my_math
     float vlim_to_dac_vlim(float v)
     {
         static_assert(MY_VLIM_MAX < 17.6f);
-        return 5.81335f - 0.33f * v; //17.6 V max
+        static_assert(MY_VLIM_MIN >= 2.5f);
+        return 5.81335f - 0.33f * v;
     }
     float encoder_to_power(int64_t cnt)
     {
