@@ -15,7 +15,7 @@
 
 #define MY_PWR_MAX 3.0f
 #define MY_VLIM_MAX 5.5f
-#define MY_VLIM_MIN 2.5f
+#define MY_VLIM_MIN 1.3f
 
 #define ENCODER_RESOLUTION_STEP 0.001f //W
 
