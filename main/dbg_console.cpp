@@ -3,6 +3,7 @@
 #include "macros.h"
 #include "params.h"
 #include "my_hal.h"
+#include "my_math.h"
 
 #include "linenoise/linenoise.h"
 #include "argtable3/argtable3.h"
@@ -177,7 +178,7 @@ namespace my_dbg_commands {
         my_params::reset_dev_info_dbg();
         return 0;
     }
-    static int set_pwr(int argc, char** argv)
+    static int set_vpwr_dac(int argc, char** argv)
     {
         if (argc < 2) return 1;
         float val;
@@ -186,13 +187,33 @@ namespace my_dbg_commands {
         my_dac::set_vpwr(val);
         return 0;
     }
-    static int set_vlim(int argc, char** argv)
+    static int set_vlim_dac(int argc, char** argv)
     {
         if (argc < 2) return 1;
         float val;
         int read = sscanf(argv[1], "%f", &val);
         if (read < 1) return 2;
         my_dac::set_vlim(val);
+        return 0;
+    }
+    static int set_pwr(int argc, char** argv)
+    {
+        if (argc < 2) return 1;
+        float val;
+        int read = sscanf(argv[1], "%f", &val);
+        if (read < 1) return 2;
+        if ((val < 0) || (val > MY_PWR_MAX)) return 3;
+        my_dac::set_vpwr(my_math::power_to_vpwr(val));
+        return 0;
+    }
+    static int set_vlim(int argc, char** argv)
+    {
+        if (argc < 2) return 1;
+        float val;
+        int read = sscanf(argv[1], "%f", &val);
+        if (read < 1) return 2;
+        if ((val < MY_VLIM_MIN) || (val > MY_VLIM_MAX)) return 3;
+        my_dac::set_vlim(my_math::vlim_to_dac_vlim(val));
         return 0;
     }
     static int override_error(int argc, char** argv)
@@ -282,6 +303,14 @@ static const esp_console_cmd_t commands[] = {
         .help = "Set overvoltage protection threshold",
         .hint = NULL,
         .func = &my_dbg_commands::set_vlim },
+    { .command = "set_vpwr_dac",
+        .help = "Set Vpwr DAC directly",
+        .hint = NULL,
+        .func = &my_dbg_commands::set_vpwr_dac },
+    { .command = "set_vlim_dac",
+        .help = "Set Vlim DAC directly",
+        .hint = NULL,
+        .func = &my_dbg_commands::set_vlim_dac },
     { .command = "override_error",
         .help = "Override any startup error",
         .hint = NULL,
