@@ -214,6 +214,7 @@ namespace my_dbg_commands {
         if (read < 1) return 2;
         if ((val < MY_VLIM_MIN) || (val > MY_VLIM_MAX)) return 3;
         my_dac::set_vlim(my_math::vlim_to_dac_vlim(val));
+        my_params::set_last_saved_vlim(val);
         return 0;
     }
     static int override_error(int argc, char** argv)
@@ -271,11 +272,11 @@ static const esp_console_cmd_t commands[] = {
         .help = "Save configuration to NVS",
         .hint = NULL,
         .func = &my_dbg_commands::save_nvs },
-    { .command = "set_dac_cal",
+    { .command = "set_vpwr_cal",
         .help = "Set DAC calibration (gain [offset]). Save NVS for this setting to persist.",
         .hint = NULL,
         .func = &my_dbg_commands::set_vpwr_cal },
-    { .command = "set_dac_cal",
+    { .command = "set_vlim_cal",
         .help = "Set DAC calibration (gain [offset]). Save NVS for this setting to persist.",
         .hint = NULL,
         .func = &my_dbg_commands::set_vlim_cal },
