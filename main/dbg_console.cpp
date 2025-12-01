@@ -4,7 +4,11 @@
 #include "params.h"
 #include "my_hal.h"
 #include "my_math.h"
+#include "eth_console_vfs.h"
+#include "eth_mdns_init.h"
 
+#include "esp_linenoise.h"
+#include "esp_linenoise_shim.h"
 #include "linenoise/linenoise.h"
 #include "argtable3/argtable3.h"
 #include "driver/uart.h"
@@ -21,20 +25,40 @@
 #include <sys/fcntl.h>
 
 #define PROMPT_STR CONFIG_IDF_TARGET
+#define PROMPT_MAX_LEN 32
+#define MAX_CMDLINE_LENGTH 256
 
 using namespace my_dbg_helpers;
+
+enum console_instances : size_t {
+    CONSOLE_INST_UART = 0,
+    CONSOLE_INST_ETH,
+
+    CONSOLE_TOTAL_INST
+};
+struct console_instance_t
+{
+    console_instances type;
+    esp_linenoise_handle_t linenoise_handle;
+    int stdout_fd;
+};
 
 static const char* TAG = "DBG_MENU";
 static const char interactive_prompt[] = LOG_COLOR_I PROMPT_STR "> " LOG_RESET_COLOR;
 static const char dumb_prompt[] = PROMPT_STR "> ";
-static const char* prompt;
 TaskHandle_t parser_task_handle;
 QueueHandle_t interop_queue_handle;
 static dbg_console::interop_cmd_t interop_cmd;
+static console_instance_t consoles[CONSOLE_TOTAL_INST] = { { .type = CONSOLE_INST_UART }, { .type = CONSOLE_INST_ETH } };
+static SemaphoreHandle_t esp_console_mutex = NULL;
+static vprintf_like_t default_vprintf = NULL;
 
 static void initialize_console();
+static void probe_terminal(esp_linenoise_handle_t h);
 
 namespace my_dbg_commands {
+    static console_instance_t* console_context = NULL;
+
     int dump_nvs(int argc, char** argv)
     {
         auto dac_cal = my_params::get_dac_cal();
@@ -245,6 +269,19 @@ namespace my_dbg_commands {
         my_params::set_dac_soft_sentinel(sentinel);
         return 0;
     }
+    static int probe(int argc, char** argv)
+    {
+        assert(console_context);
+        probe_terminal(console_context->linenoise_handle);
+        return 0;
+    }
+    static int set_hostname(int argc, char** argv)
+    {
+        if (argc < 2) return 1;
+        if (strnlen(argv[1], MDNS_MAX_HOSTNAME_LEN + 1) > MDNS_MAX_HOSTNAME_LEN) return 2;
+        my_params::set_hostname(argv[1]);
+        return 0;
+    }
 }
 
 static const esp_console_cmd_t commands[] = {
@@ -331,25 +368,33 @@ static const esp_console_cmd_t commands[] = {
     { .command = "set_dac_soft_sentinel",
         .help = "Set DAC soft sentinel threshold (hard sentinel = 3.8V)",
         .hint = NULL,
-        .func = &my_dbg_commands::set_dac_soft_sentinel }
+        .func = &my_dbg_commands::set_dac_soft_sentinel },
+    { .command = "probe",
+        .help = "Re-probe the terminal capabilities",
+        .hint = NULL,
+        .func = &my_dbg_commands::probe },
+    { .command = "set_hostname",
+        .help = "Set mDNS hostname",
+        .hint = NULL,
+        .func = &my_dbg_commands::set_hostname }
 };
 
 /// @brief Figure out if the terminal supports escape sequences
-static void probe_terminal()
+static void probe_terminal(esp_linenoise_handle_t h)
 {
     ESP_LOGI(TAG, "Will now probe...");
-    int probe_status = linenoiseProbe();
+    int probe_status = _esp_linenoise_probe(h);
     if (probe_status) { /* zero indicates success */
         printf("\n"
                "Your terminal application does not support escape sequences.\n"
                "Line editing and history features are disabled.\n"
                "On Windows, try using Putty instead. Status: %d\n", probe_status);
-        linenoiseSetDumbMode(1);
+        esp_linenoise_set_dumb_mode(h, true);
 #if CONFIG_LOG_COLORS
         /* Since the terminal doesn't support escape sequences,
          * don't use color codes in the prompt.
          */
-        prompt = dumb_prompt;
+        _esp_linenoise_set_prompt(h, dumb_prompt);
 #endif // CONFIG_LOG_COLORS
     }
     else
@@ -358,11 +403,44 @@ static void probe_terminal()
            "Type 'help' to get the list of commands.\n"
            "Use UP/DOWN arrows to navigate through command history.\n"
            "Press TAB when typing command name to auto-complete.\n");
-        linenoiseSetDumbMode(0);
+        esp_linenoise_set_dumb_mode(h, false);
 #if CONFIG_LOG_COLORS
-        prompt = interactive_prompt;
+        _esp_linenoise_set_prompt(h, interactive_prompt);
 #endif // CONFIG_LOG_COLORS
     }
+}
+static void esp_console_get_completion_wrapper(const char *str, void *cb_ctx, esp_linenoise_completion_cb_t cb)
+{
+    while (xSemaphoreTakeRecursive(esp_console_mutex, portMAX_DELAY) != pdTRUE);
+
+    linenoiseCompletions lc;
+    esp_console_get_completion(str, &lc);
+    for (size_t i = 0; i < lc.len; i++)
+    {
+        cb(cb_ctx, lc.cvec[i]);   
+    }
+
+    xSemaphoreGiveRecursive(esp_console_mutex);
+}
+static char* esp_console_get_hint_wrapper(const char *str, int *color, int *bold)
+{   
+    while (xSemaphoreTakeRecursive(esp_console_mutex, portMAX_DELAY) != pdTRUE);
+
+    char* ret = const_cast<char*>(esp_console_get_hint(str, color, bold));
+
+    xSemaphoreGiveRecursive(esp_console_mutex);
+    return ret;
+}
+static int local_vprintf(const char *fmt, va_list args)
+{
+    if (!default_vprintf) return -1;
+    int ret1 = default_vprintf(fmt, args);
+    if (consoles[CONSOLE_INST_ETH].stdout_fd != fileno(stdout))
+    {
+        int ret2 = eth_console_vfs::vprintf(fmt, args);
+        return ret2 < ret1 ? ret2 : ret1;
+    }
+    return ret1;
 }
 /// @brief Initialize esp console, lineNoise library and install uart VFS drivers, redirecting stdout into the console.
 static void initialize_console()
@@ -372,12 +450,15 @@ static void initialize_console()
         256, 0, 0, NULL, 0));
     uart_vfs_dev_port_set_rx_line_endings(CONFIG_ESP_CONSOLE_UART_NUM, ESP_LINE_ENDINGS_CR);
     uart_vfs_dev_use_driver(CONFIG_ESP_CONSOLE_UART_NUM);
-    /* Enable blocking mode on stdin, otherwise current linenoise won't work */
-    ESP_ERROR_CHECK_WITHOUT_ABORT(fcntl(fileno(stdin), F_SETFL, 0));
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(eth_console_vfs::init_console());
+    eth_console_vfs::set_rx_line_endings(ESP_LINE_ENDINGS_CR);
+    default_vprintf = esp_log_set_vprintf(local_vprintf);
+    ESP_LOGI(TAG, "Vprintf redirected successfully");
 
     /* Initialize the console */
     esp_console_config_t console_config = {
-        .max_cmdline_length = 256,
+        .max_cmdline_length = MAX_CMDLINE_LENGTH,
         .max_cmdline_args = 8,
 #if CONFIG_LOG_COLORS
         .hint_color = atoi(LOG_COLOR_CYAN)
@@ -385,74 +466,73 @@ static void initialize_console()
     };
     ESP_ERROR_CHECK(esp_console_init(&console_config));
 
-    /* Configure linenoise line completion library */
-    /* Enable multiline editing. If not set, long commands will scroll within
-     * single line.
-     */
-    linenoiseSetMultiLine(1);
-
-    /* Tell linenoise where to get command completions and hints */
-    linenoiseSetCompletionCallback((linenoiseCompletionCallback*)&esp_console_get_completion);
-    linenoiseSetHintsCallback((linenoiseHintsCallback*)&esp_console_get_hint);
-
-    /* Set command history size */
-    linenoiseHistorySetMaxLen(32);
-
-    /* Set command maximum length */
-    linenoiseSetMaxLineLen(console_config.max_cmdline_length);
-
-    /* Don't return empty lines */
-    linenoiseAllowEmpty(false);
-
-#if CONFIG_STORE_HISTORY
-    /* Load command history from filesystem */
-    linenoiseHistoryLoad(HISTORY_PATH);
+    for (size_t i = 0; i < CONSOLE_TOTAL_INST; i++)
+    {
+        esp_linenoise_config_t config;
+        esp_linenoise_get_instance_config_default(&config);
+        config.completion_cb = &esp_console_get_completion_wrapper;
+        config.hints_cb = &esp_console_get_hint_wrapper;
+        config.allow_multi_line = true;
+        config.history_max_length = 32;
+        config.max_cmd_line_length = console_config.max_cmdline_length;
+        config.allow_empty_line = false;
+        config.allow_dumb_mode = true;
+        config.prompt =
+#if CONFIG_LOG_COLORS
+            interactive_prompt
+#else
+            dumb_prompt
 #endif
+        ;
+        if (i == static_cast<size_t>(CONSOLE_INST_ETH))
+        {
+            FILE *eth_rx, *eth_tx;
+            eth_console_vfs::get_streams(&eth_rx, &eth_tx);
+            config.in_fd = fileno(eth_rx);
+            config.out_fd = fileno(eth_tx);
+        }
+        consoles[i].stdout_fd = config.out_fd;
+        ESP_ERROR_CHECK(esp_linenoise_create_instance(&config, &(consoles[i].linenoise_handle)));
+        ESP_LOGI(TAG, "Console %i initialized!", i);
+    }
 
     /* Register commands */
     esp_console_register_help_command();
     my_dbg_helpers::register_cmds(commands, ARRAY_SIZE(commands));
-
-    /* Prompt to be printed before each line.
-     * This can be customized, made dynamic, etc.
-     */
-    prompt =
-#if CONFIG_LOG_COLORS
-    interactive_prompt
-#else
-    dumb_prompt
-#endif
-    ;
-
-    probe_terminal();
-    //linenoiseSetDumbMode(0);
 }
 /// @brief Console input parser task body function.
 /// @param arg Not used
 static void parser_task(void* arg)
 {
+    char line[MAX_CMDLINE_LENGTH];
+    console_instance_t* con = reinterpret_cast<console_instance_t*>(arg);
+    switch (con->type)
+    {
+    case console_instances::CONSOLE_INST_ETH:
+        ESP_ERROR_CHECK_WITHOUT_ABORT(eth_console_vfs::redirect_std_streams());
+        break;
+    default:
+        break;
+    }
+    probe_terminal(con->linenoise_handle);
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(20));
-        /* Get a line using linenoise.
+                /* Get a line using linenoise.
          * The line is returned when ENTER is pressed.
          */
-        char* line = linenoise(prompt);
-        if (line == NULL) { /* Break on EOF or error */
+        esp_err_t res = esp_linenoise_get_line(con->linenoise_handle, line, sizeof(line));
+        if (res != ESP_OK) { /* Break on EOF or error */
             continue;
         }
-        /* Add the command to the history if not empty*/
-        if (strlen(line) > 0) {
-            linenoiseHistoryAdd(line);
-#if CONFIG_STORE_HISTORY
-            /* Save command history to filesystem */
-            linenoiseHistorySave(HISTORY_PATH);
-#endif
-        }
-        else continue;
+        ESP_ERROR_CHECK_WITHOUT_ABORT(esp_linenoise_history_add(con->linenoise_handle, line));
 
         /* Try to run the command */
         int ret;
+        while (xSemaphoreTakeRecursive(esp_console_mutex, portMAX_DELAY) != pdTRUE);
+        my_dbg_commands::console_context = con;
         esp_err_t err = esp_console_run(line, &ret);
+        my_dbg_commands::console_context = NULL;
+        xSemaphoreGiveRecursive(esp_console_mutex);
         if (err == ESP_ERR_NOT_FOUND) {
             ESP_LOGW(TAG, "Unrecognized command: '%s'\n", line);
         } else if (err == ESP_ERR_INVALID_ARG) {
@@ -462,8 +542,6 @@ static void parser_task(void* arg)
         } else if (err != ESP_OK) {
             ESP_LOGE(TAG, "Internal error: %s\n", esp_err_to_name(err));
         }
-        /* linenoise allocates line buffer on the heap, so need to free it */
-        linenoiseFree(line);
     }
 }
 
@@ -523,9 +601,12 @@ namespace dbg_console {
     {
         ESP_LOGI(TAG, "Initializing...");
         assert(interop_queue);
+        esp_console_mutex = xSemaphoreCreateRecursiveMutex();
+        assert(esp_console_mutex);
 
         interop_queue_handle = interop_queue;
         initialize_console();
-        xTaskCreate(parser_task, "dbg_console_parser", 10000, NULL, 1, &parser_task_handle);
+        assert(xTaskCreate(parser_task, "uart_console_parser", 10000, &(consoles[console_instances::CONSOLE_INST_UART]), 1, NULL) == pdPASS);
+        assert(xTaskCreate(parser_task, "eth_console_parser", 10000, &(consoles[console_instances::CONSOLE_INST_ETH]), 1, NULL) == pdPASS);
     }
 }

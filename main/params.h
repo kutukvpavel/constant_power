@@ -113,4 +113,6 @@ namespace my_params
     void set_dac_soft_sentinel(float v);
     void set_last_saved_vpwr(float v);
     void set_last_saved_vlim(float v);
+    const char* get_hostname();
+    void set_hostname(const char* n);
 }

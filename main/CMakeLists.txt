@@ -6,6 +6,7 @@ idf_component_register(SRCS "main.cpp"
                             "my_dac.cpp"
                             "modbus.cpp"
                             "my_math.cpp"
+                            "esp_linenoise_shim.c"
                         PRIV_REQUIRES esp_netif 
                             esp_eth 
                             nvs_flash 
@@ -15,5 +16,5 @@ idf_component_register(SRCS "main.cpp"
                             console
                             spiffs
                             spi_flash
-                        REQUIRES my_modbus ethernet_init my_lcd macros ESP32Encoder
+                        REQUIRES my_modbus ethernet_init my_lcd macros ESP32Encoder esp_eth_console
                        INCLUDE_DIRS ".")

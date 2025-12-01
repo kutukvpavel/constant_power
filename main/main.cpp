@@ -21,6 +21,7 @@
 #include "my_hal.h"
 #include "modbus.h"
 #include "my_math.h"
+#include "eth_mdns_init.h"
 
 #define BUTTON_DEBOUNCE_DELAY 10 //x[main loop delay]
 
@@ -50,6 +51,11 @@ void app_main(void)
     }
     //Init DAC calibrations
     my_dac::init(my_params::get_dac_cal());
+    //Init mDNS
+    mdns_start_service(my_params::get_hostname(), FIRMWARE_VERSION_STR);
+    mdns_register_modbus(CONFIG_FMB_TCP_PORT_DEFAULT, CONFIG_FMB_CONTROLLER_SLAVE_ID);
+    mdns_register_console(CONFIG_CONSOLE_PORT);
+    mdns_register_echo(CONFIG_ECHO_PORT);
     //Modbus Slave
     modbus::init(my_hal::get_netif());
     //Display

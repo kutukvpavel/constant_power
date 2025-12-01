@@ -24,7 +24,7 @@ namespace modbus
         {
         case (MB_EVENT_HOLDING_REG_WR | MB_EVENT_HOLDING_REG_RD):
             // Get parameter information from parameter queue
-            ESP_LOGI(TAG, "HOLDING %s (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
+            ESP_LOGD(TAG, "HOLDING %s (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
                     rw_str,
                     reg_info->time_stamp,
                     (unsigned)reg_info->mb_offset,
@@ -34,7 +34,7 @@ namespace modbus
             
             break;
         case MB_EVENT_INPUT_REG_RD:
-            ESP_LOGI(TAG, "INPUT READ (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
+            ESP_LOGD(TAG, "INPUT READ (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
                     reg_info->time_stamp,
                     (unsigned)reg_info->mb_offset,
                     (unsigned)reg_info->type,
@@ -42,7 +42,7 @@ namespace modbus
                     (unsigned)reg_info->size);
             break;
         case MB_EVENT_DISCRETE_RD:
-            ESP_LOGI(TAG, "DISCRETE READ (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
+            ESP_LOGD(TAG, "DISCRETE READ (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
                     reg_info->time_stamp,
                     (unsigned)reg_info->mb_offset,
                     (unsigned)reg_info->type,
@@ -50,7 +50,7 @@ namespace modbus
                     (unsigned)reg_info->size);
             break;
         case MB_EVENT_COILS_RD | MB_EVENT_COILS_WR:
-            ESP_LOGI(TAG, "COILS %s (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
+            ESP_LOGD(TAG, "COILS %s (%" PRIu32 " us), ADDR:%u, TYPE:%u, INST_ADDR:0x%" PRIx32 ", SIZE:%u",
                     rw_str,
                     reg_info->time_stamp,
                     (unsigned)reg_info->mb_offset,
@@ -66,7 +66,6 @@ namespace modbus
     void init(esp_netif_t* netif_ptr)
     {
         //Start modbus slave server
-        ESP_ERROR_CHECK(init_services());
         mb_communication_info_t tcp_slave_config = {
             .tcp_opts = {
                 .mode = MB_TCP,

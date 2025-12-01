@@ -10,6 +10,8 @@
 
 #include "params.h"
 
+#include "eth_mdns_init.h"
+
 #include "nvs.h"
 #include "nvs_handle.hpp"
 #include "rom/crc.h"
@@ -28,13 +30,15 @@ struct my_param_storage_common_t
 {
     my_dac_cal_t dac_cal;
     float dac_soft_sentinel;
+    char mdns_name[MDNS_MAX_HOSTNAME_LEN];
 };
 /// @brief NVS RAM cache, initialized with defaults
 static my_param_storage_common_t storage =
-    {
-        .dac_cal = my_params::default_dac_cal,
-        .dac_soft_sentinel = 5.0f
-    };
+{
+    .dac_cal = my_params::default_dac_cal,
+    .dac_soft_sentinel = 5.0f,
+    .mdns_name = "cpwr"
+};
 static float last_set_pwr = 0;
 static float last_set_vlim = 5.0f;
 /// @brief SPIFFS configuration
@@ -48,7 +52,7 @@ static esp_vfs_spiffs_conf_t flash_conf =
 /// @brief Debug console log tag
 static const char TAG[] = "PARAMS";
 /*** NVS storage constants */
-static const uint8_t storage_ver = 3;
+static const uint8_t storage_ver = 4;
 static const char storage_ver_id[] = "storage_ver";
 static const char storage_val_id[] = "storage";
 static const char my_nvs_namespace[] = "my";
@@ -146,6 +150,15 @@ namespace my_params
     void set_last_saved_vlim(float v)
     {
         last_set_vlim = v;
+    }
+
+    const char* get_hostname()
+    {
+        return storage.mdns_name;
+    }
+    void set_hostname(const char* n)
+    {
+        strncpy(storage.mdns_name, n, MDNS_MAX_HOSTNAME_LEN);
     }
 
     /// @brief Set serial number string

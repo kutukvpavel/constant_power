@@ -1,3 +1,9 @@
 [submodule "components/ESP32Encoder"]
 	path = components/ESP32Encoder
 	url = git@github.com:kutukvpavel/ESP32Encoder.git
+[submodule "components/ethernet_init"]
+	path = components/ethernet_init
+	url = git@github.com:kutukvpavel/ethernet_init.git
+[submodule "components/esp_eth_console"]
+	path = components/esp_eth_console
+	url = git@github.com:kutukvpavel/esp_eth_console.git
