@@ -52,11 +52,11 @@
 #include "my_lcd.h"
 #include "macros.h"
 
-#define MS 1000
+#define MS (1000)
 
 #define GPIO_BIT(x) (1ULL << (x))
 
-#define DELAY_CMD_LONG  (3000) // >1.53ms according to datasheet
+#define DELAY_CMD_LONG  (4000 / MS) // >1.53ms according to datasheet
 #define DELAY_CMD_SHORT (40)     // >39us according to datasheet
 #define DELAY_TOGGLE    (1)      // E cycle time >= 1μs, E pulse width >= 450ns, Data set-up time >= 195ns
 #define DELAY_INIT      (5 * MS)
@@ -92,7 +92,7 @@
 
 #define init_delay()   do { ets_delay_us(DELAY_INIT); } while (0)
 #define short_delay()  do { ets_delay_us(DELAY_CMD_SHORT); } while (0)
-#define long_delay()   do { vTaskDelay(pdMS_TO_TICKS(DELAY_CMD_LONG / 1000)); } while (0)
+#define long_delay()   do { vTaskDelay(pdMS_TO_TICKS(DELAY_CMD_LONG)); } while (0)
 #define toggle_delay() do { ets_delay_us(DELAY_TOGGLE); } while (0)
 
 #define CHECK_ARG(VAL) do { if (!(VAL)) return ESP_ERR_INVALID_ARG; } while (0)
@@ -221,7 +221,7 @@ namespace my_lcd
     esp_err_t set_function(const hd44780_t *lcd, an6866_page_t ch_page)
     {
         CHECK(write_byte(lcd,
-                CMD_FUNC_SET
+                CMD_FUNC_SET | ARG_FS_8_BIT
                     | (lcd->lines > 1 ? ARG_FS_2_LINES : 0)
                     | (lcd->lines > 2 ? ARG_FS_4_LINES : 0)
                     | (lcd->font == HD44780_FONT_5X10 ? ARG_FS_FONT_5X10 : 0)

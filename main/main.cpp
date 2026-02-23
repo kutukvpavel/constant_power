@@ -65,7 +65,7 @@ void app_main(void)
         ESP_LOGE(TAG, "Init failed: menu. %s", esp_err_to_name(ret));
         init_ok = false;
     }
-    else menu::print_message(menu::localized_messages::initializing);
+    else menu::print_str("Hello"); //menu::print_message(menu::localized_messages::initializing);
     //Debug console
     dbg_queue = xQueueCreate(4, sizeof(dbg_console::interop_cmd_t));
     dbg_console::init(dbg_queue);

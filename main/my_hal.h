@@ -11,7 +11,7 @@
 
 #include "my_lcd.h"
 
-#define FIRMWARE_VERSION_STR "constant_pwr-v0.1"
+#define FIRMWARE_VERSION_STR "cpwr-v0.2"
 
 #define MY_PWR_MAX 3.0f
 #define MY_VLIM_MAX 5.5f

@@ -27,5 +27,6 @@
     "cmath": "cpp",
     "esp_mac.h": "c"
   },
-  "idf.flashType": "UART"
+  "idf.flashType": "UART",
+  "idf.currentSetup": "/home/paul/esp/v5.5.1/esp-idf"
 }

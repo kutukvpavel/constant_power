@@ -66,7 +66,7 @@ namespace my_lcd
     enum an6866_page_t
     {
         AN6866_PAGE_0 = 0,
-        AD6866_PAGE_1 = _BV(1)
+        AN6866_PAGE_1 = _BV(1)
     };
 
     struct hd44780_t;

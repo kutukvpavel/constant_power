@@ -96,7 +96,7 @@ namespace menu
         assert(lcd);
         lcd_cfg = lcd;
 
-        auto ret = my_lcd::init(lcd_cfg, my_lcd::an6866_page_t::AD6866_PAGE_1);
+        auto ret = my_lcd::init(lcd_cfg, my_lcd::an6866_page_t::AN6866_PAGE_0);
         repaint_mutex = xSemaphoreCreateMutex();
         assert(repaint_mutex);
         xTaskCreate(repaint_task_body, "MY_MENU_task", 3072, NULL, 1, &repaint_task_handle);
